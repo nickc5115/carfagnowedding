@@ -1,0 +1,6 @@
+name = "wedding-uploader"
+compatibility_date = "2024-12-01"
+
+[[r2_buckets]]
+binding = "WEDDING_PHOTOS"
+bucket_name = "wedding-photos"
