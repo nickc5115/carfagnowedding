@@ -17,6 +17,7 @@
       --paper: #fff;
       --bg: #eef2f7;
     }
+    *, *::before, *::after { box-sizing: border-box; }
     body {
       font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
       background:
@@ -29,10 +30,11 @@
     }
     .wrap {
       max-width: 520px;
-      margin: 40px auto;
+      width: 100%;
+      margin: 24px auto;
       background: #dee9fa;
       border-radius: 18px;
-      padding: 26px;
+      padding: 24px 20px;
       box-shadow: 0 18px 40px rgba(33, 46, 63, 0.12);
       border: 2px solid rgba(201, 163, 90, 0.7);
       position: relative;
@@ -155,11 +157,16 @@
       color: var(--dusty-blue-dark);
       font-weight: 600;
     }
+    thead th,
+    tbody td { text-align: center; }
+    .progressCell { text-align: center; }
     tbody td { padding: 10px 6px; vertical-align: middle; }
-    th.col-file { width: 58%; }
-    th.col-progress { width: 24%; }
-    th.col-status { width: 18%; }
-    .statusCell { text-align: right; white-space: nowrap; }
+    th.col-file { width: 45%; }
+    th.col-progress { width: 35%; }
+    th.col-status { width: 20%; }
+    .statusCell { white-space: nowrap; }
+    .statusCell .status-text { display: inline; }
+    .statusCell .status-emoji { display: inline; }
     tbody tr:last-child { border-bottom: none; }
     .footer-note {
       margin-top: 18px;
@@ -176,6 +183,23 @@
       font-size: 12px;
       text-align: center;
       letter-spacing: 0.3px;
+    }
+    @media (max-width: 480px) {
+      .wrap {
+        width: 100%;
+        margin: 16px auto;
+        padding: 20px 16px;
+        border-radius: 16px;
+      }
+      h1 { font-size: 24px; }
+      .logo { width: 120px; height: 120px; }
+      .auth-card { width: min(320px, 88%); }
+      table { font-size: 14px; }
+      th.col-file { width: 44%; }
+      th.col-progress { width: 36%; }
+      th.col-status { width: 20%; }
+      tbody td { padding: 8px 4px; }
+      .statusCell .status-text { display: none; }
     }
     .auth-gate {
       position: absolute;
@@ -272,7 +296,7 @@
 
 <table id="uploadTable">
   <thead>
-    <tr style="text-align:left;">
+    <tr>
       <th class="col-file">File</th>
       <th class="col-progress">Progress</th>
       <th class="col-status">Status</th>

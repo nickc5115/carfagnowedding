@@ -106,13 +106,16 @@ function createRow(file) {
   nameTd.style.padding = "10px 0";
   nameTd.style.paddingRight = "10px";
   nameTd.style.overflow = "hidden";
-  nameTd.innerHTML = `<div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${file.name}</div>
+  const baseName = file.name.replace(/\.[^.]+$/, "");
+  const displayName = baseName.length > 10 ? `${baseName.slice(0, 10)}…` : baseName;
+  nameTd.innerHTML = `<div style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${displayName}</div>
                       <div class="size" style="color:#666; font-size:12px;">${formatBytes(file.size)}</div>`;
 
   const progTd = document.createElement("td");
-  progTd.style.padding = "10px 10px 10px 0";
+  progTd.style.padding = "10px 0";
+  progTd.className = "progressCell";
   progTd.innerHTML = `
-    <div style="background:#eee; border-radius:999px; height:10px; overflow:hidden; border:1px solid #111;">
+    <div style="background:#eee; border-radius:999px; height:10px; overflow:hidden; border:1px solid #111; margin:0 auto;">
       <div class="bar" style="height:10px; width:0%; background:#c9a35a;"></div>
     </div>
   `;
@@ -120,7 +123,7 @@ function createRow(file) {
   const statusTd = document.createElement("td");
   statusTd.style.padding = "10px 0";
   statusTd.className = "statusCell";
-  statusTd.textContent = "Pending";
+  setStatusCell(statusTd, "Pending");
 
   tr.appendChild(nameTd);
   tr.appendChild(progTd);
@@ -129,6 +132,11 @@ function createRow(file) {
   const bar = tr.querySelector(".bar");
   const sizeEl = nameTd.querySelector(".size");
   return { tr, bar, statusTd, sizeEl };
+}
+
+function setStatusCell(statusTd, text, emoji = "") {
+  const safeEmoji = emoji ? ` <span class="status-emoji">${emoji}</span>` : "";
+  statusTd.innerHTML = `<span class="status-text">${text}</span>${safeEmoji}`;
 }
 
 function resetTable() {
@@ -228,7 +236,7 @@ async function prepareUploadFile(file, row) {
 
 function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderName) {
   return new Promise((resolve, reject) => {
-    statusTd.textContent = "Uploading…";
+    setStatusCell(statusTd, "Uploading…");
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload", true);
@@ -251,20 +259,20 @@ function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderN
 
     xhr.onload = () => {
       if (xhr.status === 401 || xhr.status === 403) {
-        statusTd.textContent = "Wrong password ❌";
+        setStatusCell(statusTd, "Wrong password", "❌");
         reject(new Error("Unauthorized"));
       } else if (xhr.status >= 200 && xhr.status < 300) {
         bar.style.width = "100%";
-        statusTd.textContent = "Uploaded ✅";
+        setStatusCell(statusTd, "Done", "✅");
         resolve();
       } else {
-        statusTd.textContent = `Failed (${xhr.status}) ❌`;
+        setStatusCell(statusTd, `Failed (${xhr.status})`, "❌");
         reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
       }
     };
 
     xhr.onerror = () => {
-      statusTd.textContent = "Network error ❌";
+      setStatusCell(statusTd, "Network error", "❌");
       reject(new Error("Network error"));
     };
 
