@@ -6,8 +6,8 @@ export const onRequest: PagesFunction<{
   }
 
   const contentType = request.headers.get("content-type") || ""
-  if (!contentType.startsWith("image/")) {
-    return new Response("Only images allowed", { status: 400 })
+  if (!contentType.startsWith("image/") && !contentType.startsWith("video/")) {
+    return new Response("Only images or videos allowed", { status: 400 })
   }
 
   const id = crypto.randomUUID()

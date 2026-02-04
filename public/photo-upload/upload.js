@@ -6,7 +6,7 @@ const rowsByFile = new Map();
 
 // Tune these:
 const MAX_CONCURRENCY = 3; // 2–4 is good for phones
-const MAX_MB = 15;         // optional client-side guardrail
+const MAX_MB = 50;         // optional client-side guardrail (videos are bigger)
 const MAX_DIM = 2000;      // downscale large photos for faster uploads
 const JPEG_QUALITY = 0.82; // balance size vs quality
 const COMPRESS_MIN_BYTES = 1.5 * 1024 * 1024; // skip tiny files
@@ -79,8 +79,16 @@ fileInput.addEventListener("change", () => {
   setStatus(`Ready to upload ${files.length} photo(s).`);
 });
 
+function isImage(file) {
+  return (file.type || "").startsWith("image/");
+}
+
+function isVideo(file) {
+  return (file.type || "").startsWith("video/");
+}
+
 function shouldCompress(file) {
-  return file.size >= COMPRESS_MIN_BYTES;
+  return isImage(file) && file.size >= COMPRESS_MIN_BYTES;
 }
 
 function loadImage(file) {
@@ -204,11 +212,11 @@ uploadBtn.addEventListener("click", async () => {
   }
 
   // Basic client-side filtering/guardrails
-  const valid = files.filter(f => (f.type || "").startsWith("image/"));
+  const valid = files.filter(f => isImage(f) || isVideo(f));
   const tooBig = valid.filter(f => f.size > MAX_MB * 1024 * 1024);
 
   if (valid.length === 0) {
-    setStatus("Only image files are allowed.");
+    setStatus("Only image or video files are allowed.");
     return;
   }
 
