@@ -7,6 +7,9 @@ const rowsByFile = new Map();
 // Tune these:
 const MAX_CONCURRENCY = 3; // 2–4 is good for phones
 const MAX_MB = 15;         // optional client-side guardrail
+const MAX_DIM = 2000;      // downscale large photos for faster uploads
+const JPEG_QUALITY = 0.82; // balance size vs quality
+const COMPRESS_MIN_BYTES = 1.5 * 1024 * 1024; // skip tiny files
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -26,7 +29,7 @@ function createRow(file) {
   nameTd.style.paddingRight = "10px";
   nameTd.style.wordBreak = "break-word";
   nameTd.innerHTML = `<div style="font-weight:600;">${file.name}</div>
-                      <div style="color:#666; font-size:12px;">${formatBytes(file.size)}</div>`;
+                      <div class="size" style="color:#666; font-size:12px;">${formatBytes(file.size)}</div>`;
 
   const progTd = document.createElement("td");
   progTd.style.padding = "10px 10px 10px 0";
@@ -46,7 +49,8 @@ function createRow(file) {
   tr.appendChild(statusTd);
 
   const bar = tr.querySelector(".bar");
-  return { tr, bar, statusTd };
+  const sizeEl = nameTd.querySelector(".size");
+  return { tr, bar, statusTd, sizeEl };
 }
 
 function resetTable() {
@@ -75,7 +79,76 @@ fileInput.addEventListener("change", () => {
   setStatus(`Ready to upload ${files.length} photo(s).`);
 });
 
-function uploadFileXHR(file, { bar, statusTd }) {
+function shouldCompress(file) {
+  return file.size >= COMPRESS_MIN_BYTES;
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = (err) => {
+      URL.revokeObjectURL(url);
+      reject(err);
+    };
+    img.src = url;
+  });
+}
+
+async function compressImage(file) {
+  const img = await loadImage(file);
+  const maxDim = MAX_DIM;
+  let targetW = img.width;
+  let targetH = img.height;
+
+  if (img.width > maxDim || img.height > maxDim) {
+    const scale = Math.min(maxDim / img.width, maxDim / img.height);
+    targetW = Math.round(img.width * scale);
+    targetH = Math.round(img.height * scale);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
+  );
+
+  if (!blob) return file;
+
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+    type: "image/jpeg"
+  });
+}
+
+async function prepareUploadFile(file, row) {
+  if (!shouldCompress(file)) {
+    return { uploadFile: file, contentType: file.type || "application/octet-stream" };
+  }
+
+  row.statusTd.textContent = "Optimizing…";
+
+  try {
+    const compressed = await compressImage(file);
+    if (compressed.size < file.size) {
+      row.sizeEl.textContent = `${formatBytes(compressed.size)} (optimized)`;
+      return { uploadFile: compressed, contentType: compressed.type || file.type };
+    }
+  } catch (err) {
+    console.warn("Image optimization failed, uploading original.", err);
+  }
+
+  return { uploadFile: file, contentType: file.type || "application/octet-stream" };
+}
+
+function uploadFileXHR(file, { bar, statusTd }, contentType) {
   return new Promise((resolve, reject) => {
     statusTd.textContent = "Uploading…";
 
@@ -83,7 +156,7 @@ function uploadFileXHR(file, { bar, statusTd }) {
     xhr.open("POST", "/api/upload", true);
 
     // Required so your Worker sees content-type
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.setRequestHeader("Content-Type", contentType || file.type || "application/octet-stream");
 
     xhr.upload.onprogress = (evt) => {
       if (!evt.lengthComputable) return;
@@ -153,7 +226,10 @@ uploadBtn.addEventListener("click", async () => {
       rowsByFile.set(file, row);
       tbody.appendChild(row.tr);
     }
-    return () => uploadFileXHR(file, row);
+    return async () => {
+      const { uploadFile, contentType } = await prepareUploadFile(file, row);
+      return uploadFileXHR(uploadFile, row, contentType);
+    };
   });
 
   try {
