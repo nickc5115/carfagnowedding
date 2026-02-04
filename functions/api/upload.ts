@@ -26,7 +26,11 @@ export const onRequest: PagesFunction<{
 
   const id = crypto.randomUUID()
   const date = new Date().toISOString().slice(0, 10)
-  const key = `uploads/${date}/${id}`
+  const uploader = request.headers.get("x-uploader-name") || "guest"
+  const original = request.headers.get("x-original-name") || "photo"
+  const safeUploader = uploader.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+  const safeOriginal = original.replace(/[^a-zA-Z0-9._-]+/g, "-")
+  const key = `uploads/${date}/${safeUploader}-${id}-${safeOriginal}`
 
   await env.WEDDING_PHOTOS.put(key, request.body, {
     httpMetadata: { contentType }

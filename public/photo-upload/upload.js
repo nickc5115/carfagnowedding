@@ -5,6 +5,7 @@ const tbody = document.getElementById("uploadTbody");
 const authGate = document.getElementById("authGate");
 const authBtn = document.getElementById("authBtn");
 const authPassword = document.getElementById("authPassword");
+const authName = document.getElementById("authName");
 const authHint = document.getElementById("authHint");
 const rowsByFile = new Map();
 
@@ -23,10 +24,18 @@ function getPassword() {
   return sessionStorage.getItem("upload_password") || "";
 }
 
+function getUploaderName() {
+  return sessionStorage.getItem("upload_name") || "";
+}
+
+function setUploaderName(name) {
+  sessionStorage.setItem("upload_name", name);
+}
+
 function showAuthGate(message) {
   if (authGate) authGate.classList.add("is-active");
   if (authHint && message) authHint.textContent = message;
-  if (authPassword) authPassword.focus();
+  if (authName) authName.focus();
 }
 
 function hideAuthGate() {
@@ -54,20 +63,22 @@ async function verifyPassword(pw) {
 
 function initAuthGate() {
   if (!authGate) return;
-  if (getPassword()) {
+  if (getPassword() && getUploaderName()) {
     hideAuthGate();
   } else {
     showAuthGate("Enter the shared password to upload.");
   }
 
   const submit = async () => {
+    const name = authName ? authName.value.trim() : "";
     const pw = authPassword ? authPassword.value.trim() : "";
-    if (!pw) {
-      if (authHint) authHint.textContent = "Password required.";
+    if (!name || !pw) {
+      if (authHint) authHint.textContent = "Name and password required.";
       return;
     }
     const ok = await verifyPassword(pw);
     if (ok) {
+      setUploaderName(name);
       setPassword(pw);
     } else if (authHint) {
       authHint.textContent = "Wrong password. Please try again.";
@@ -215,7 +226,7 @@ async function prepareUploadFile(file, row) {
   return { uploadFile: file, contentType: file.type || "application/octet-stream" };
 }
 
-function uploadFileXHR(file, { bar, statusTd }, contentType, password) {
+function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderName) {
   return new Promise((resolve, reject) => {
     statusTd.textContent = "Uploading…";
 
@@ -226,6 +237,10 @@ function uploadFileXHR(file, { bar, statusTd }, contentType, password) {
     xhr.setRequestHeader("Content-Type", contentType || file.type || "application/octet-stream");
     if (password) {
       xhr.setRequestHeader("X-Upload-Password", password);
+    }
+    if (uploaderName) {
+      xhr.setRequestHeader("X-Uploader-Name", uploaderName);
+      xhr.setRequestHeader("X-Original-Name", file.name);
     }
 
     xhr.upload.onprogress = (evt) => {
@@ -291,9 +306,10 @@ uploadBtn.addEventListener("click", async () => {
   }
 
   const password = getPassword();
-  if (!password) {
-    setStatus("Password required to upload.");
-    showAuthGate("Enter the shared password to upload.");
+  const uploaderName = getUploaderName();
+  if (!password || !uploaderName) {
+    setStatus("Name and password required to upload.");
+    showAuthGate("Enter your name and the shared password.");
     return;
   }
 
@@ -308,7 +324,7 @@ uploadBtn.addEventListener("click", async () => {
     }
     return async () => {
       const { uploadFile, contentType } = await prepareUploadFile(file, row);
-      return uploadFileXHR(uploadFile, row, contentType, password);
+      return uploadFileXHR(uploadFile, row, contentType, password, uploaderName);
     };
   });
 
@@ -321,6 +337,7 @@ uploadBtn.addEventListener("click", async () => {
     console.error(e);
     if (String(e?.message || "").includes("Unauthorized")) {
       sessionStorage.removeItem("upload_password");
+      sessionStorage.removeItem("upload_name");
       setStatus("Wrong password — please try again.");
       showAuthGate("Wrong password. Please try again.");
     } else {
