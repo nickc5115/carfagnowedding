@@ -2,6 +2,7 @@ const uploadBtn = document.getElementById("uploadBtn");
 const fileInput = document.getElementById("photos");
 const statusEl = document.getElementById("status");
 const tbody = document.getElementById("uploadTbody");
+const rowsByFile = new Map();
 
 // Tune these:
 const MAX_CONCURRENCY = 3; // 2–4 is good for phones
@@ -47,6 +48,32 @@ function createRow(file) {
   const bar = tr.querySelector(".bar");
   return { tr, bar, statusTd };
 }
+
+function resetTable() {
+  tbody.innerHTML = "";
+  rowsByFile.clear();
+}
+
+function ensureRows(files) {
+  resetTable();
+  files.forEach((file) => {
+    const row = createRow(file);
+    rowsByFile.set(file, row);
+    tbody.appendChild(row.tr);
+  });
+}
+
+fileInput.addEventListener("change", () => {
+  const files = Array.from(fileInput.files || []);
+  if (files.length === 0) {
+    resetTable();
+    setStatus("");
+    return;
+  }
+
+  ensureRows(files);
+  setStatus(`Ready to upload ${files.length} photo(s).`);
+});
 
 function uploadFileXHR(file, { bar, statusTd }) {
   return new Promise((resolve, reject) => {
@@ -98,9 +125,6 @@ async function runWithConcurrency(tasks, limit) {
 uploadBtn.addEventListener("click", async () => {
   const files = Array.from(fileInput.files || []);
 
-  // Reset table
-  tbody.innerHTML = "";
-
   if (files.length === 0) {
     setStatus("Pick at least one photo first 🙂");
     return;
@@ -118,16 +142,17 @@ uploadBtn.addEventListener("click", async () => {
   if (tooBig.length > 0) {
     setStatus(`Some files are over ${MAX_MB}MB and may fail on slow connections.`);
     // We’ll still try; you can choose to block instead.
-  } else {
-    setStatus(`Ready to upload ${valid.length} photo(s).`);
   }
 
   uploadBtn.disabled = true;
 
   // Create rows + tasks
   const tasks = valid.map((file) => {
-    const row = createRow(file);
-    tbody.appendChild(row.tr);
+    const row = rowsByFile.get(file) || createRow(file);
+    if (!rowsByFile.has(file)) {
+      rowsByFile.set(file, row);
+      tbody.appendChild(row.tr);
+    }
     return () => uploadFileXHR(file, row);
   });
 
@@ -142,4 +167,4 @@ uploadBtn.addEventListener("click", async () => {
   } finally {
     uploadBtn.disabled = false;
   }
-});
+}); 
