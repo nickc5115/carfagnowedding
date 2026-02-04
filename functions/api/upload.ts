@@ -1,6 +1,16 @@
 export const onRequest: PagesFunction<{
   WEDDING_PHOTOS: R2Bucket
+  UPLOAD_PASSWORD?: string
 }> = async ({ request, env }) => {
+  if (!env.UPLOAD_PASSWORD) {
+    return new Response("Server not configured", { status: 500 })
+  }
+
+  const provided = request.headers.get("x-upload-password") || ""
+  if (provided !== env.UPLOAD_PASSWORD) {
+    return new Response("Unauthorized", { status: 401 })
+  }
+
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 })
   }

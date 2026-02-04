@@ -177,11 +177,78 @@
       text-align: center;
       letter-spacing: 0.3px;
     }
+    .auth-gate {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(222, 233, 250, 0.9);
+      backdrop-filter: blur(4px);
+      z-index: 5;
+    }
+    .auth-gate.is-active { display: flex; }
+    .auth-card {
+      width: min(360px, 85%);
+      background: #fff;
+      border: 1px solid rgba(201, 163, 90, 0.5);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 16px 32px rgba(33, 46, 63, 0.18);
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .auth-title {
+      font-weight: 600;
+      color: var(--dusty-blue-dark);
+      margin-bottom: 6px;
+    }
+    .auth-subtitle {
+      color: #5c6776;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    #authPassword {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(131, 155, 191, 0.6);
+      outline: none;
+      margin-bottom: 12px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+    #authBtn {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 0;
+      background: linear-gradient(135deg, var(--dusty-blue), var(--dusty-blue-dark));
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(95, 118, 152, 0.24);
+      border: 1px solid rgba(131, 155, 191, 0.45);
+      margin-bottom: 8px;
+    }
+    .auth-hint {
+      font-size: 12px;
+      color: #8a95a6;
+      min-height: 16px;
+    }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
+  <div class="wrap" id="app">
+    <div class="auth-gate" id="authGate" aria-hidden="true">
+      <div class="auth-card">
+        <div class="auth-title">Welcome to our wedding photo drop</div>
+        <div class="auth-subtitle">Please enter the password to continue</div>
+        <input id="authPassword" type="password" placeholder="Password" />
+        <button id="authBtn" type="button">Enter</button>
+        <div class="auth-hint" id="authHint"></div>
+      </div>
+    </div>
     <div class="bg-leaves"></div>
     <div class="corner-glow"></div>
     <div class="subtitle">Wedding Photo Drop</div>

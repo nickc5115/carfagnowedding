@@ -2,6 +2,10 @@ const uploadBtn = document.getElementById("uploadBtn");
 const fileInput = document.getElementById("photos");
 const statusEl = document.getElementById("status");
 const tbody = document.getElementById("uploadTbody");
+const authGate = document.getElementById("authGate");
+const authBtn = document.getElementById("authBtn");
+const authPassword = document.getElementById("authPassword");
+const authHint = document.getElementById("authHint");
 const rowsByFile = new Map();
 
 // Tune these:
@@ -13,6 +17,51 @@ const COMPRESS_MIN_BYTES = 1.5 * 1024 * 1024; // skip tiny files
 
 function setStatus(msg) {
   statusEl.textContent = msg;
+}
+
+function getPassword() {
+  return sessionStorage.getItem("upload_password") || "";
+}
+
+function showAuthGate(message) {
+  if (authGate) authGate.classList.add("is-active");
+  if (authHint && message) authHint.textContent = message;
+  if (authPassword) authPassword.focus();
+}
+
+function hideAuthGate() {
+  if (authGate) authGate.classList.remove("is-active");
+  if (authHint) authHint.textContent = "";
+}
+
+function setPassword(pw) {
+  sessionStorage.setItem("upload_password", pw);
+  hideAuthGate();
+}
+
+function initAuthGate() {
+  if (!authGate) return;
+  if (getPassword()) {
+    hideAuthGate();
+  } else {
+    showAuthGate("Enter the shared password to upload.");
+  }
+
+  const submit = () => {
+    const pw = authPassword ? authPassword.value.trim() : "";
+    if (!pw) {
+      if (authHint) authHint.textContent = "Password required.";
+      return;
+    }
+    setPassword(pw);
+  };
+
+  if (authBtn) authBtn.addEventListener("click", submit);
+  if (authPassword) {
+    authPassword.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+    });
+  }
 }
 
 function formatBytes(bytes) {
@@ -148,7 +197,7 @@ async function prepareUploadFile(file, row) {
   return { uploadFile: file, contentType: file.type || "application/octet-stream" };
 }
 
-function uploadFileXHR(file, { bar, statusTd }, contentType) {
+function uploadFileXHR(file, { bar, statusTd }, contentType, password) {
   return new Promise((resolve, reject) => {
     statusTd.textContent = "Uploading…";
 
@@ -157,6 +206,9 @@ function uploadFileXHR(file, { bar, statusTd }, contentType) {
 
     // Required so your Worker sees content-type
     xhr.setRequestHeader("Content-Type", contentType || file.type || "application/octet-stream");
+    if (password) {
+      xhr.setRequestHeader("X-Upload-Password", password);
+    }
 
     xhr.upload.onprogress = (evt) => {
       if (!evt.lengthComputable) return;
@@ -165,7 +217,10 @@ function uploadFileXHR(file, { bar, statusTd }, contentType) {
     };
 
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
+      if (xhr.status === 401 || xhr.status === 403) {
+        statusTd.textContent = "Wrong password ❌";
+        reject(new Error("Unauthorized"));
+      } else if (xhr.status >= 200 && xhr.status < 300) {
         bar.style.width = "100%";
         statusTd.textContent = "Uploaded ✅";
         resolve();
@@ -217,6 +272,13 @@ uploadBtn.addEventListener("click", async () => {
     // We’ll still try; you can choose to block instead.
   }
 
+  const password = getPassword();
+  if (!password) {
+    setStatus("Password required to upload.");
+    showAuthGate("Enter the shared password to upload.");
+    return;
+  }
+
   uploadBtn.disabled = true;
 
   // Create rows + tasks
@@ -228,7 +290,7 @@ uploadBtn.addEventListener("click", async () => {
     }
     return async () => {
       const { uploadFile, contentType } = await prepareUploadFile(file, row);
-      return uploadFileXHR(uploadFile, row, contentType);
+      return uploadFileXHR(uploadFile, row, contentType, password);
     };
   });
 
@@ -239,8 +301,16 @@ uploadBtn.addEventListener("click", async () => {
     fileInput.value = "";
   } catch (e) {
     console.error(e);
-    setStatus("Some uploads failed — you can tap Upload again to retry.");
+    if (String(e?.message || "").includes("Unauthorized")) {
+      sessionStorage.removeItem("upload_password");
+      setStatus("Wrong password — please try again.");
+      showAuthGate("Wrong password. Please try again.");
+    } else {
+      setStatus("Some uploads failed — you can tap Upload again to retry.");
+    }
   } finally {
     uploadBtn.disabled = false;
   }
 }); 
+
+initAuthGate();
