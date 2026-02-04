@@ -11,6 +11,10 @@ export const onRequest: PagesFunction<{
     return new Response("Unauthorized", { status: 401 })
   }
 
+  if (request.method === "GET") {
+    return new Response("OK", { status: 200 })
+  }
+
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 })
   }

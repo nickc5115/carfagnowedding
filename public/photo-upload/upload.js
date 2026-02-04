@@ -39,6 +39,19 @@ function setPassword(pw) {
   hideAuthGate();
 }
 
+async function verifyPassword(pw) {
+  try {
+    const res = await fetch("/api/upload", {
+      method: "GET",
+      headers: { "X-Upload-Password": pw }
+    });
+    return res.ok;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+}
+
 function initAuthGate() {
   if (!authGate) return;
   if (getPassword()) {
@@ -47,13 +60,18 @@ function initAuthGate() {
     showAuthGate("Enter the shared password to upload.");
   }
 
-  const submit = () => {
+  const submit = async () => {
     const pw = authPassword ? authPassword.value.trim() : "";
     if (!pw) {
       if (authHint) authHint.textContent = "Password required.";
       return;
     }
-    setPassword(pw);
+    const ok = await verifyPassword(pw);
+    if (ok) {
+      setPassword(pw);
+    } else if (authHint) {
+      authHint.textContent = "Wrong password. Please try again.";
+    }
   };
 
   if (authBtn) authBtn.addEventListener("click", submit);
