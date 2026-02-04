@@ -7,6 +7,7 @@ const authBtn = document.getElementById("authBtn");
 const authPassword = document.getElementById("authPassword");
 const authName = document.getElementById("authName");
 const authHint = document.getElementById("authHint");
+const greeting = document.getElementById("greeting");
 const rowsByFile = new Map();
 
 // Tune these:
@@ -30,6 +31,7 @@ function getUploaderName() {
 
 function setUploaderName(name) {
   sessionStorage.setItem("upload_name", name);
+  updateGreeting(name);
 }
 
 function showAuthGate(message) {
@@ -41,6 +43,15 @@ function showAuthGate(message) {
 function hideAuthGate() {
   if (authGate) authGate.classList.remove("is-active");
   if (authHint) authHint.textContent = "";
+}
+
+function updateGreeting(name) {
+  if (!greeting) return;
+  if (!name) {
+    greeting.textContent = "Hello";
+    return;
+  }
+  greeting.textContent = `Hey there, ${name}!`;
 }
 
 function setPassword(pw) {
@@ -65,6 +76,7 @@ function initAuthGate() {
   if (!authGate) return;
   if (getPassword() && getUploaderName()) {
     hideAuthGate();
+    updateGreeting(getUploaderName());
   } else {
     showAuthGate("Enter the shared password to upload.");
   }
