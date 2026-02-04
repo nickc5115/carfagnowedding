@@ -27,15 +27,15 @@ function createRow(file) {
   const nameTd = document.createElement("td");
   nameTd.style.padding = "10px 0";
   nameTd.style.paddingRight = "10px";
-  nameTd.style.wordBreak = "break-word";
-  nameTd.innerHTML = `<div style="font-weight:600;">${file.name}</div>
+  nameTd.style.overflow = "hidden";
+  nameTd.innerHTML = `<div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${file.name}</div>
                       <div class="size" style="color:#666; font-size:12px;">${formatBytes(file.size)}</div>`;
 
   const progTd = document.createElement("td");
   progTd.style.padding = "10px 10px 10px 0";
   progTd.innerHTML = `
-    <div style="background:#eee; border-radius:999px; height:10px; overflow:hidden;">
-      <div class="bar" style="height:10px; width:0%; background:#111;"></div>
+    <div style="background:#eee; border-radius:999px; height:10px; overflow:hidden; border:1px solid #111;">
+      <div class="bar" style="height:10px; width:0%; background:#c9a35a;"></div>
     </div>
   `;
 

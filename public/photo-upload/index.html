@@ -7,10 +7,10 @@
 
   <style>
     :root {
-      --dusty-blue: #7a8fa6;
-      --dusty-blue-dark: #5e728b;
-      --dusty-blue-light: #a8b8cc;
-      --dusty-blue-ice: #eaf0f7;
+      --dusty-blue: #839bbf;
+      --dusty-blue-dark: #5f7698;
+      --dusty-blue-light: #b8c8dc;
+      --dusty-blue-ice: #e3ebf5;
       --gold: #c9a35a;
       --gold-soft: #f3e6c8;
       --ink: #2b2f38;
@@ -20,9 +20,9 @@
     body {
       font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
       background:
-        radial-gradient(900px 360px at 20% -120px, #dce6f2, transparent 60%),
-        radial-gradient(900px 360px at 80% -120px, #d3dfef, transparent 60%),
-        linear-gradient(180deg, #e9eff7, var(--bg));
+        radial-gradient(900px 360px at 20% -120px, #d6e0ee, transparent 60%),
+        radial-gradient(900px 360px at 80% -120px, #cfdbec, transparent 60%),
+        linear-gradient(180deg, #e1e9f4, var(--bg));
       color: var(--ink);
       margin: 0;
       padding: 0;
@@ -30,11 +30,11 @@
     .wrap {
       max-width: 520px;
       margin: 40px auto;
-      background: linear-gradient(180deg, #ffffff, #f6f9fd);
+      background: #dee9fa;
       border-radius: 18px;
       padding: 26px;
       box-shadow: 0 18px 40px rgba(33, 46, 63, 0.12);
-      border: 1px solid rgba(122, 143, 166, 0.18);
+      border: 2px solid rgba(201, 163, 90, 0.7);
       position: relative;
       overflow: hidden;
     }
@@ -45,16 +45,25 @@
       left: 0;
       right: 0;
       height: 6px;
-      background: linear-gradient(90deg, var(--dusty-blue), var(--gold));
+      background: linear-gradient(90deg, var(--dusty-blue), var(--dusty-blue-dark));
     }
     .wrap::after {
       content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--dusty-blue), var(--dusty-blue-dark));
+      pointer-events: none;
+    }
+    .corner-glow {
       position: absolute;
       top: 0;
       right: 0;
       width: 140px;
       height: 140px;
-      background: radial-gradient(circle at top right, rgba(122, 143, 166, 0.2), transparent 60%);
+      background: radial-gradient(circle at top right, rgba(131, 155, 191, 0.22), transparent 60%);
       pointer-events: none;
     }
     .wrap .bg-leaves {
@@ -63,8 +72,8 @@
       pointer-events: none;
       opacity: 0.25;
       background-image:
-        radial-gradient(10px 10px at 18px 18px, rgba(122, 143, 166, 0.25), transparent 60%),
-        radial-gradient(10px 10px at 40px 50px, rgba(122, 143, 166, 0.2), transparent 60%);
+        radial-gradient(10px 10px at 18px 18px, rgba(131, 155, 191, 0.28), transparent 60%),
+        radial-gradient(10px 10px at 40px 50px, rgba(131, 155, 191, 0.22), transparent 60%);
       background-size: 120px 120px;
       mix-blend-mode: multiply;
     }
@@ -114,12 +123,12 @@
       color: var(--gold);
     }
     .box {
-      border: 2px dashed rgba(122, 143, 166, 0.55);
+      border: 2px dashed rgba(131, 155, 191, 0.7);
       border-radius: 14px;
       padding: 18px;
-      background: linear-gradient(180deg, #f6f9fd, #eef3f9);
+      background: linear-gradient(180deg, #f1f6fd, #e6eef9);
       margin: 14px 0 18px;
-      box-shadow: inset 0 0 0 1px rgba(122, 143, 166, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(131, 155, 191, 0.12);
     }
     input[type="file"] { width: 100%; }
     button {
@@ -131,8 +140,8 @@
       background: linear-gradient(135deg, var(--dusty-blue), var(--dusty-blue-dark));
       color: #fff;
       cursor: pointer;
-      box-shadow: 0 10px 20px rgba(94, 114, 139, 0.24);
-      border: 1px solid rgba(201, 163, 90, 0.35);
+      box-shadow: 0 10px 20px rgba(95, 118, 152, 0.28);
+      border: 1px solid rgba(131, 155, 191, 0.45);
       text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
     }
     button:hover { filter: brightness(1.03); }
@@ -155,24 +164,32 @@
     .footer-note {
       margin-top: 18px;
       padding-top: 12px;
-      border-top: 1px dashed rgba(122, 143, 166, 0.35);
+      border-top: 1px dashed rgba(131, 155, 191, 0.45);
       color: #5c6776;
       font-size: 13px;
       text-align: center;
     }
     .footer-note span { color: var(--gold); }
+    .footer-credit {
+      margin-top: 8px;
+      color: #7a8798;
+      font-size: 12px;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <div class="bg-leaves"></div>
+    <div class="corner-glow"></div>
     <div class="subtitle">Wedding Photo Drop</div>
     <div class="logo-wrap">
       <img class="logo" src="/photo-upload/logo.png" alt="Samantha & Nicholas monogram" />
     </div>
     <h1>Share your photos 📸</h1>
-    <div class="ornament"><span class="rings">♡</span> Forever <span class="rings">♡</span></div>
+    <div class="ornament"><span class="rings">♡</span> Forever Memories<span class="rings">♡</span></div>
     <p>Thank you for celebrating with us — add your favorite moments from the ceremony, reception, and dance floor.</p>
 
     <div class="box">
@@ -195,6 +212,7 @@
   <tbody id="uploadTbody"></tbody>
 </table>
     <div class="footer-note">Leave us a little memory ✨ <span>Thank you</span> for sharing our day.</div>
+    <div class="footer-credit">Designed by Nick Carfagno</div>
   </div>
 
   <!-- IMPORTANT: absolute path so it works from /photo-upload/ -->
