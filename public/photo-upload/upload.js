@@ -557,19 +557,18 @@ uploadBtn.addEventListener("click", async () => {
 
 initAuthGate();
 
-// --- Easter egg: 5 quick clicks on the logo launches a hidden Galaga clone.
+// --- Easter egg: 5-second long-press on the logo launches a hidden Galaga clone.
 (function setupEasterEgg() {
   const logo = document.querySelector(".logo");
   if (!logo) return;
-  const NEEDED = 5;
-  const WINDOW_MS = 3000;
-  let count = 0;
-  let firstAt = 0;
+  const HOLD_MS = 5000;
+  let holdTimer = null;
   let loading = false;
   let loaded = false;
 
   function loadGame() {
-    if (loaded || loading) return loaded ? Promise.resolve() : loading;
+    if (loaded) return Promise.resolve();
+    if (loading) return loading;
     loading = new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = "/photo-upload/galaga.js";
@@ -581,23 +580,33 @@ initAuthGate();
     return loading;
   }
 
-  logo.addEventListener("click", async (e) => {
-    e.preventDefault();
-    const now = Date.now();
-    if (count === 0 || now - firstAt > WINDOW_MS) {
-      count = 1;
-      firstAt = now;
-      return;
-    }
-    count++;
-    if (count >= NEEDED) {
-      count = 0;
+  function startHold(e) {
+    if (e) e.preventDefault();
+    if (holdTimer !== null) return;
+    holdTimer = setTimeout(async () => {
+      holdTimer = null;
       try {
         await loadGame();
         if (typeof window.startGalaga === "function") window.startGalaga();
       } catch (err) {
         console.warn("Could not launch galaga:", err);
       }
+    }, HOLD_MS);
+  }
+
+  function cancelHold() {
+    if (holdTimer !== null) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
     }
-  });
+  }
+
+  // Use pointer events so we get unified mouse + touch + pen handling.
+  logo.addEventListener("pointerdown", startHold);
+  logo.addEventListener("pointerup", cancelHold);
+  logo.addEventListener("pointercancel", cancelHold);
+  logo.addEventListener("pointerleave", cancelHold);
+  // Suppress iOS Safari's "Save Image" / "Copy" callout on long-press.
+  logo.addEventListener("contextmenu", (e) => e.preventDefault());
+  logo.addEventListener("dragstart", (e) => e.preventDefault());
 })();
