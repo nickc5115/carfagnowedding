@@ -1,4 +1,5 @@
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // 25MB hard cap
+const RATE_LIMIT_PER_HOUR = 100
 
 const IMAGE_SIGNATURES: Array<{ type: string; bytes: number[]; offset?: number }> = [
   { type: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
@@ -34,10 +35,53 @@ function timingSafeEqual(a: string, b: string): boolean {
   return mismatch === 0
 }
 
-export const onRequest: PagesFunction<{
+async function verifyTurnstile(
+  secret: string,
+  token: string,
+  remoteip: string | null
+): Promise<boolean> {
+  if (!token) return false
+  const form = new FormData()
+  form.append("secret", secret)
+  form.append("response", token)
+  if (remoteip) form.append("remoteip", remoteip)
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: form
+    })
+    if (!res.ok) return false
+    const data = (await res.json()) as { success?: boolean }
+    return data.success === true
+  } catch {
+    return false
+  }
+}
+
+async function checkRateLimit(
+  kv: KVNamespace,
+  ip: string
+): Promise<{ allowed: boolean; count: number }> {
+  const bucket = Math.floor(Date.now() / (60 * 60 * 1000)) // hour bucket
+  const key = `rl:${ip}:${bucket}`
+  const current = Number((await kv.get(key)) || "0")
+  if (current >= RATE_LIMIT_PER_HOUR) {
+    return { allowed: false, count: current }
+  }
+  // Best-effort increment. KV is eventually consistent; for this scale
+  // (a wedding) a small overcount is fine.
+  await kv.put(key, String(current + 1), { expirationTtl: 60 * 60 })
+  return { allowed: true, count: current + 1 }
+}
+
+type Env = {
   WEDDING_PHOTOS: R2Bucket
   UPLOAD_PASSWORD?: string
-}> = async ({ request, env }) => {
+  TURNSTILE_SECRET_KEY?: string
+  RATE_LIMIT?: KVNamespace
+}
+
+export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.UPLOAD_PASSWORD) {
     return new Response("Server not configured", { status: 500 })
   }
@@ -47,12 +91,31 @@ export const onRequest: PagesFunction<{
     return new Response("Unauthorized", { status: 401 })
   }
 
+  const ip = request.headers.get("cf-connecting-ip") || ""
+
+  // GET = password-verify call from the auth gate. Validate Turnstile here so
+  // bots can't even confirm the password is correct.
   if (request.method === "GET") {
+    if (env.TURNSTILE_SECRET_KEY) {
+      const token = request.headers.get("x-turnstile-token") || ""
+      const ok = await verifyTurnstile(env.TURNSTILE_SECRET_KEY, token, ip)
+      if (!ok) return new Response("Turnstile verification failed", { status: 403 })
+    }
     return new Response("OK", { status: 200 })
   }
 
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 })
+  }
+
+  if (env.RATE_LIMIT && ip) {
+    const { allowed, count } = await checkRateLimit(env.RATE_LIMIT, ip)
+    if (!allowed) {
+      return new Response(`Rate limit exceeded (${count}/hr)`, {
+        status: 429,
+        headers: { "Retry-After": "3600" }
+      })
+    }
   }
 
   const contentLength = Number(request.headers.get("content-length") || "0")

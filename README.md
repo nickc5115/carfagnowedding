@@ -56,6 +56,37 @@ The R2 binding (`WEDDING_PHOTOS` → `wedding-photos`) is declared in
 `wrangler.toml` and must also be configured in the Cloudflare Pages project
 settings under **Settings → Functions → R2 bucket bindings**.
 
+### Abuse protection (optional but recommended)
+
+Two layers, both gracefully no-op if not configured.
+
+**Cloudflare Turnstile** — bot challenge on the auth gate.
+
+1. In the Cloudflare dashboard, go to **Turnstile → Add site**, choose the
+   *Managed* widget, and add your domain.
+2. Copy the **site key** into `public/photo-upload/index.html` — replace
+   `YOUR_TURNSTILE_SITE_KEY` on the `<div id="turnstile" data-sitekey="…">`.
+3. Set the **secret key** as a Pages secret:
+   ```
+   wrangler pages secret put TURNSTILE_SECRET_KEY --project-name wedding-uploader
+   ```
+
+If `TURNSTILE_SECRET_KEY` is unset, the server skips the check. If the site
+key in HTML is left as the placeholder, the widget is hidden client-side.
+
+**Per-IP rate limit** — 100 uploads/IP/hour, backed by Workers KV.
+
+1. Create a KV namespace and copy its id:
+   ```
+   wrangler kv namespace create RATE_LIMIT
+   ```
+2. Uncomment the `[[kv_namespaces]]` block in `wrangler.toml` and paste the
+   id.
+3. Configure the same binding (`RATE_LIMIT`) in **Pages → Settings →
+   Functions → KV namespace bindings**.
+
+If the binding is missing, the rate limiter is skipped.
+
 ## Workflow
 
 - Cut feature branches off `development`, not `main` (`main` is unused legacy).
