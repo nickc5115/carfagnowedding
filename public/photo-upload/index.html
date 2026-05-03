@@ -361,21 +361,6 @@
     .galaga-btn:hover { background: rgba(40, 40, 40, 0.7); }
     .galaga-close { top: 12px; right: 12px; font-size: 26px; }
     .galaga-mute  { top: 12px; left: 12px; font-size: 18px; }
-    .galaga-fire {
-      bottom: 24px;
-      right: 24px;
-      width: 80px;
-      height: 80px;
-      border-radius: 999px;
-      background: rgba(201, 163, 90, 0.55);
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      font-size: 14px;
-      letter-spacing: 1px;
-      font-weight: 700;
-      line-height: 76px;
-      display: none;
-    }
-    .galaga-overlay.is-touch .galaga-fire { display: block; }
   </style>
 </head>
 
@@ -421,7 +406,6 @@
     <canvas id="galagaCanvas" class="galaga-canvas" width="480" height="720"></canvas>
     <button id="galagaClose" class="galaga-btn galaga-close" type="button" aria-label="Close">×</button>
     <button id="galagaMute" class="galaga-btn galaga-mute" type="button" aria-label="Mute">🔊</button>
-    <button id="galagaFire" class="galaga-btn galaga-fire" type="button" aria-label="Fire">FIRE</button>
   </div>
 
   <!-- IMPORTANT: absolute path so it works from /photo-upload/ -->

@@ -13,9 +13,9 @@
   const PLAYER_SPEED = 260;
   const PLAYER_BULLET_SPEED = 720;
   const ENEMY_BULLET_SPEED = 280;
-  const PLAYER_FIRE_COOLDOWN = 0.18;
+  const PLAYER_FIRE_COOLDOWN = 0.11;
   const RESPAWN_DELAY = 1.4;
-  const BULLET_LIMIT_SINGLE = 1;
+  const BULLET_LIMIT_SINGLE = 4;
 
   const COLS = 8;
   const ROWS = 5;
@@ -99,7 +99,7 @@
 
   // ---------- Game state ----------
   let canvas, ctx;
-  let overlay, closeBtn, muteBtn, fireBtn;
+  let overlay, closeBtn, muteBtn;
   let rafId = null;
   let prevTs = 0;
   let running = false;
@@ -872,7 +872,9 @@
     const t = e.changedTouches[0];
     const p = canvasPosFromTouch(t);
     touch.active = true;
+    touch.fire = true;
     touch.x = p.x;
+    fireDownEdge = true;
     e.preventDefault();
   }
   function onTouchMove(e) {
@@ -884,18 +886,9 @@
   }
   function onTouchEnd(e) {
     touch.active = false;
+    touch.fire = false;
     e.preventDefault();
   }
-
-  function onFireDown(e) {
-    ensureAudio();
-    if (state === "title") { startNewGame(); e.preventDefault(); return; }
-    if (state === "game-over") { startNewGame(); e.preventDefault(); return; }
-    touch.fire = true;
-    fireDownEdge = true;
-    e.preventDefault();
-  }
-  function onFireUp(e) { touch.fire = false; e.preventDefault(); }
 
   function onClickFirstGesture() { ensureAudio(); }
 
@@ -911,10 +904,6 @@
     overlay = document.getElementById("galagaOverlay");
     closeBtn = document.getElementById("galagaClose");
     muteBtn = document.getElementById("galagaMute");
-    fireBtn = document.getElementById("galagaFire");
-    // Show touch fire button on coarse pointers (phones/tablets).
-    const isTouch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-    if (isTouch) overlay.classList.add("is-touch");
   }
 
   function attachInput() {
@@ -927,10 +916,6 @@
     canvas.addEventListener("mousedown", onClickFirstGesture);
     closeBtn.addEventListener("click", close);
     muteBtn.addEventListener("click", () => { ensureAudio(); toggleMute(); });
-    fireBtn.addEventListener("touchstart", onFireDown, { passive: false });
-    fireBtn.addEventListener("touchend", onFireUp, { passive: false });
-    fireBtn.addEventListener("mousedown", onFireDown);
-    fireBtn.addEventListener("mouseup", onFireUp);
   }
   function detachInput() {
     window.removeEventListener("keydown", onKeyDown);
@@ -941,10 +926,6 @@
     canvas.removeEventListener("touchcancel", onTouchEnd);
     canvas.removeEventListener("mousedown", onClickFirstGesture);
     closeBtn.removeEventListener("click", close);
-    fireBtn.removeEventListener("touchstart", onFireDown);
-    fireBtn.removeEventListener("touchend", onFireUp);
-    fireBtn.removeEventListener("mousedown", onFireDown);
-    fireBtn.removeEventListener("mouseup", onFireUp);
   }
 
   function close() {
