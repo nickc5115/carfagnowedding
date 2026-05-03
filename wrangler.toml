@@ -4,3 +4,10 @@ compatibility_date = "2024-12-01"
 [[r2_buckets]]
 binding = "WEDDING_PHOTOS"
 bucket_name = "wedding-photos"
+
+# Optional: KV namespace for per-IP upload rate limiting.
+# To enable, create the namespace and uncomment + fill in the id:
+#   wrangler kv namespace create RATE_LIMIT
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "REPLACE_WITH_KV_NAMESPACE_ID"

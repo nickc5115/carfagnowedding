@@ -92,17 +92,56 @@ function setPassword(pw) {
   hideAuthGate();
 }
 
-async function verifyPassword(pw) {
+async function verifyPassword(pw, turnstileToken) {
   try {
-    const res = await fetch("/api/upload", {
-      method: "GET",
-      headers: { "X-Upload-Password": pw }
-    });
-    return res.ok;
+    const headers = { "X-Upload-Password": pw };
+    if (turnstileToken) headers["X-Turnstile-Token"] = turnstileToken;
+    const res = await fetch("/api/upload", { method: "GET", headers });
+    return { ok: res.ok, status: res.status };
   } catch (err) {
     console.error(err);
-    return false;
+    return { ok: false, status: 0 };
   }
+}
+
+const turnstileEl = document.getElementById("turnstile");
+const turnstileSiteKey = turnstileEl ? turnstileEl.getAttribute("data-sitekey") : "";
+const turnstileEnabled = !!(turnstileEl && turnstileSiteKey && turnstileSiteKey !== "YOUR_TURNSTILE_SITE_KEY");
+let turnstileWidgetId = null;
+
+function renderTurnstile() {
+  if (!turnstileEnabled || !window.turnstile || turnstileWidgetId !== null) return;
+  turnstileWidgetId = window.turnstile.render(turnstileEl, {
+    sitekey: turnstileSiteKey,
+    theme: "light"
+  });
+}
+
+function getTurnstileToken() {
+  if (!turnstileEnabled || !window.turnstile || turnstileWidgetId === null) return "";
+  return window.turnstile.getResponse(turnstileWidgetId) || "";
+}
+
+function resetTurnstile() {
+  if (!turnstileEnabled || !window.turnstile || turnstileWidgetId === null) return;
+  window.turnstile.reset(turnstileWidgetId);
+}
+
+window.onloadTurnstileCallback = renderTurnstile;
+// Cloudflare's api.js calls window.onloadTurnstileCallback if present, but
+// since we load it without that param we render on a short interval.
+if (turnstileEnabled) {
+  const tryRender = () => {
+    if (window.turnstile) {
+      renderTurnstile();
+    } else {
+      setTimeout(tryRender, 100);
+    }
+  };
+  tryRender();
+} else if (turnstileEl) {
+  // Hide the empty container so it doesn't add blank space.
+  turnstileEl.style.display = "none";
 }
 
 function initAuthGate() {
@@ -121,12 +160,21 @@ function initAuthGate() {
       if (authHint) authHint.textContent = "Name and password required.";
       return;
     }
-    const ok = await verifyPassword(pw);
-    if (ok) {
+    const token = getTurnstileToken();
+    if (turnstileEnabled && !token) {
+      if (authHint) authHint.textContent = "Please complete the verification challenge.";
+      return;
+    }
+    const result = await verifyPassword(pw, token);
+    if (result.ok) {
       setUploaderName(name);
       setPassword(pw);
+    } else if (result.status === 403) {
+      if (authHint) authHint.textContent = "Verification failed. Please try the challenge again.";
+      resetTurnstile();
     } else if (authHint) {
       authHint.textContent = "Wrong password. Please try again.";
+      resetTurnstile();
     }
   };
 

@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Photo Upload 📸</title>
+  <!--
+    Turnstile (Cloudflare bot protection). Replace YOUR_TURNSTILE_SITE_KEY
+    with the site key from your Turnstile dashboard. If left as the
+    placeholder, the widget will show an error and the auth gate will
+    refuse to submit (the script also handles a no-Turnstile case).
+  -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
   <style>
     :root {
@@ -271,6 +278,7 @@
         <div class="auth-subtitle">Please enter your name and the password to continue</div>
         <input id="authName" type="text" placeholder="Your name" />
         <input id="authPassword" type="password" placeholder="Password" />
+        <div id="turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY" style="margin: 0 0 12px; display: flex; justify-content: center;"></div>
         <button id="authBtn" type="button">Enter</button>
         <div class="auth-hint" id="authHint"></div>
       </div>
