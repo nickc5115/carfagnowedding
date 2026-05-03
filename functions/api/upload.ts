@@ -86,26 +86,32 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
     return new Response("Server not configured", { status: 500 })
   }
 
-  const provided = request.headers.get("x-upload-password") || ""
-  if (!timingSafeEqual(provided, env.UPLOAD_PASSWORD)) {
-    return new Response("Unauthorized", { status: 401 })
-  }
-
   const ip = request.headers.get("cf-connecting-ip") || ""
+  const provided = request.headers.get("x-upload-password") || ""
 
-  // GET = password-verify call from the auth gate. Validate Turnstile here so
-  // bots can't even confirm the password is correct.
+  // GET = password-verify call from the auth gate. Check Turnstile BEFORE the
+  // password so a bot without a valid token cannot distinguish 401 (wrong
+  // password) from 403 (no/bad token) and use this endpoint as a password
+  // oracle.
   if (request.method === "GET") {
     if (env.TURNSTILE_SECRET_KEY) {
       const token = request.headers.get("x-turnstile-token") || ""
       const ok = await verifyTurnstile(env.TURNSTILE_SECRET_KEY, token, ip)
       if (!ok) return new Response("Turnstile verification failed", { status: 403 })
     }
+    if (!timingSafeEqual(provided, env.UPLOAD_PASSWORD)) {
+      return new Response("Unauthorized", { status: 401 })
+    }
     return new Response("OK", { status: 200 })
   }
 
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 })
+  }
+
+  // POST: the auth gate has already passed Turnstile. Just check the password.
+  if (!timingSafeEqual(provided, env.UPLOAD_PASSWORD)) {
+    return new Response("Unauthorized", { status: 401 })
   }
 
   if (env.RATE_LIMIT && ip) {
