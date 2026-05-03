@@ -490,10 +490,11 @@
     } else if (e.mode === "tractor") {
       // Sit at top with beam open for a few seconds.
       e.attackBeam = clamp(e.modeT / 0.6, 0, 1);
-      // Beam check: triangle from boss down 320px wide at base.
+      // Beam check: triangle from boss down to the player line.
       if (player && player.alive && !player.capturing && e.modeT > 0.6 && e.modeT < 2.4) {
-        const beamHalf = lerp(20, 110, clamp((player.y - e.y) / 320, 0, 1));
-        if (Math.abs(player.x - e.x) < beamHalf && player.y > e.y && player.y < e.y + 360) {
+        const beamLen = H - 80 - e.y; // reach the player area
+        const beamHalf = lerp(18, 130, clamp((player.y - e.y) / beamLen, 0, 1));
+        if (Math.abs(player.x - e.x) < beamHalf && player.y > e.y && player.y < e.y + beamLen) {
           // Start capturing
           player.capturing = true;
           player.captureBoss = e;
@@ -894,8 +895,9 @@
   function drawBeam(e) {
     const a = e.attackBeam;
     if (a <= 0) return;
-    const baseY = e.y + 360;
-    const baseHalf = 110 * a;
+    const beamLen = H - 80 - e.y;
+    const baseY = e.y + beamLen;
+    const baseHalf = 130 * a;
     const grad = ctx.createLinearGradient(e.x, e.y, e.x, baseY);
     grad.addColorStop(0, "rgba(255,225,77,0.9)");
     grad.addColorStop(1, "rgba(255,225,77,0)");
@@ -911,8 +913,8 @@
     const phase = (performance.now() / 80) % 24;
     ctx.strokeStyle = "rgba(255,255,255,0.35)";
     ctx.lineWidth = 1;
-    for (let yy = phase; yy < 360; yy += 24) {
-      const f = yy / 360;
+    for (let yy = phase; yy < beamLen; yy += 24) {
+      const f = yy / beamLen;
       const half = lerp(12, baseHalf, f);
       ctx.beginPath();
       ctx.moveTo(e.x - half, e.y + 4 + yy);
