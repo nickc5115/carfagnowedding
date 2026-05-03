@@ -321,31 +321,17 @@
     }
     .galaga-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      /* width and height are set in JS via window.visualViewport so we
-         always match the truly-visible area on iOS Safari/Chrome
-         regardless of URL-bar state. CSS fallback in case JS hasn't
-         run yet. */
+      inset: 0;
       width: 100vw;
-      height: 100vh;
+      height: 100vh;       /* fallback */
+      height: 100dvh;      /* dynamic viewport — handles iOS URL-bar collapse */
       background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      place-items: center;
       z-index: 9999;
       touch-action: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Just respect notch + home indicator. Buttons float over the
-         canvas in the bottom corners so the playfield can use the full
-         available height. */
-      padding:
-        calc(env(safe-area-inset-top) + 16px)
-        env(safe-area-inset-right)
-        calc(env(safe-area-inset-bottom) + 16px)
-        env(safe-area-inset-left);
-      box-sizing: border-box;
     }
     .galaga-overlay[hidden] { display: none; }
     .galaga-canvas {
@@ -354,8 +340,17 @@
       image-rendering: crisp-edges;
       background: #000;
       box-shadow: 0 0 80px rgba(80, 130, 220, 0.18);
-      /* width/height set by JS fitCanvas() to letterbox the 480x720
-         playfield into whatever the overlay's content box is. */
+      /* Letterbox the 480x720 playfield: pick whichever dimension fits.
+         Fallback uses vh; browsers that support dvh get a tighter fit
+         that respects the live viewport. */
+      width: min(100vw, calc(100vh * 480 / 720));
+      height: min(100vh, calc(100vw * 720 / 480));
+    }
+    @supports (height: 100dvh) {
+      .galaga-canvas {
+        width: min(100vw, calc(100dvh * 480 / 720));
+        height: min(100dvh, calc(100vw * 720 / 480));
+      }
     }
     .galaga-btn {
       position: fixed;
