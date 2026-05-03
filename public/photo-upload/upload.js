@@ -556,3 +556,48 @@ uploadBtn.addEventListener("click", async () => {
 }); 
 
 initAuthGate();
+
+// --- Easter egg: 5 quick clicks on the logo launches a hidden Galaga clone.
+(function setupEasterEgg() {
+  const logo = document.querySelector(".logo");
+  if (!logo) return;
+  const NEEDED = 5;
+  const WINDOW_MS = 3000;
+  let count = 0;
+  let firstAt = 0;
+  let loading = false;
+  let loaded = false;
+
+  function loadGame() {
+    if (loaded || loading) return loaded ? Promise.resolve() : loading;
+    loading = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "/photo-upload/galaga.js";
+      s.async = true;
+      s.onload = () => { loaded = true; resolve(); };
+      s.onerror = () => { loading = null; reject(new Error("galaga load failed")); };
+      document.head.appendChild(s);
+    });
+    return loading;
+  }
+
+  logo.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    if (count === 0 || now - firstAt > WINDOW_MS) {
+      count = 1;
+      firstAt = now;
+      return;
+    }
+    count++;
+    if (count >= NEEDED) {
+      count = 0;
+      try {
+        await loadGame();
+        if (typeof window.startGalaga === "function") window.startGalaga();
+      } catch (err) {
+        console.warn("Could not launch galaga:", err);
+      }
+    }
+  });
+})();
