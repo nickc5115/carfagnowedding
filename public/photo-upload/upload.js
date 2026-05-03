@@ -561,7 +561,7 @@ initAuthGate();
 (function setupEasterEgg() {
   const logo = document.querySelector(".logo");
   if (!logo) return;
-  const HOLD_MS = 5000;
+  const HOLD_MS = 2500;
   let holdTimer = null;
   let loading = false;
   let loaded = false;
