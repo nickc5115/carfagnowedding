@@ -106,7 +106,7 @@ async function verifyPassword(pw, turnstileToken) {
   }
 }
 
-const turnstileEl = document.getElementById("turnstile");
+const turnstileEl = document.getElementById("turnstileWidget");
 const turnstileSiteKey = turnstileEl ? turnstileEl.getAttribute("data-sitekey") : "";
 const turnstileEnabled = !!(turnstileEl && turnstileSiteKey && turnstileSiteKey !== "YOUR_TURNSTILE_SITE_KEY");
 let turnstileWidgetId = null;
