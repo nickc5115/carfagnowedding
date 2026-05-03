@@ -71,6 +71,8 @@ function showAuthGate(message) {
   if (authGate) authGate.classList.add("is-active");
   if (authHint && message) authHint.textContent = message;
   if (authName) authName.focus();
+  turnstileGateVisible = true;
+  if (typeof maybeRenderTurnstile === "function") maybeRenderTurnstile();
 }
 
 function hideAuthGate() {
@@ -109,8 +111,12 @@ const turnstileSiteKey = turnstileEl ? turnstileEl.getAttribute("data-sitekey") 
 const turnstileEnabled = !!(turnstileEl && turnstileSiteKey && turnstileSiteKey !== "YOUR_TURNSTILE_SITE_KEY");
 let turnstileWidgetId = null;
 
-function renderTurnstile() {
+let turnstileReady = false;
+let turnstileGateVisible = false;
+
+function maybeRenderTurnstile() {
   if (!turnstileEnabled || turnstileWidgetId !== null) return;
+  if (!turnstileReady || !turnstileGateVisible) return;
   if (!window.turnstile || typeof window.turnstile.render !== "function") return;
   turnstileWidgetId = window.turnstile.render(turnstileEl, {
     sitekey: turnstileSiteKey,
@@ -128,16 +134,22 @@ function resetTurnstile() {
   window.turnstile.reset(turnstileWidgetId);
 }
 
-// Turnstile api.js is loaded with ?render=explicit&onload=onloadTurnstileCallback,
-// so it will invoke this global once the library is ready to render widgets.
-window.onloadTurnstileCallback = renderTurnstile;
+// Turnstile api.js is loaded with ?render=explicit&onload=onloadTurnstileCallback.
+// We can't render until BOTH the library is ready AND the auth gate is visible
+// (Turnstile won't render into a display:none container).
+window.onloadTurnstileCallback = () => {
+  turnstileReady = true;
+  maybeRenderTurnstile();
+};
+
+// Cover the race where api.js loaded before this script ran.
+if (turnstileEnabled && window.turnstile && typeof window.turnstile.render === "function") {
+  turnstileReady = true;
+}
 
 if (!turnstileEnabled && turnstileEl) {
   // Hide the empty container so it doesn't add blank space.
   turnstileEl.style.display = "none";
-} else if (turnstileEnabled && window.turnstile && typeof window.turnstile.render === "function") {
-  // Edge case: api.js finished loading before this script ran.
-  renderTurnstile();
 }
 
 function initAuthGate() {
