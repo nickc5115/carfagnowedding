@@ -16,6 +16,39 @@ const MAX_MB = 15;         // optional client-side guardrail
 const MAX_DIM = 2000;      // downscale large photos for faster uploads
 const JPEG_QUALITY = 0.82; // balance size vs quality
 const COMPRESS_MIN_BYTES = 1.5 * 1024 * 1024; // skip tiny files
+const UPLOAD_MAX_ATTEMPTS = 3; // initial + 2 retries
+const HEIC2ANY_URL = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+
+let heic2anyLoader = null;
+function loadHeic2Any() {
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (heic2anyLoader) return heic2anyLoader;
+  heic2anyLoader = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = HEIC2ANY_URL;
+    s.async = true;
+    s.onload = () => resolve(window.heic2any);
+    s.onerror = () => {
+      heic2anyLoader = null;
+      reject(new Error("Failed to load HEIC converter"));
+    };
+    document.head.appendChild(s);
+  });
+  return heic2anyLoader;
+}
+
+function isHeic(file) {
+  const t = (file.type || "").toLowerCase();
+  if (t === "image/heic" || t === "image/heif") return true;
+  return /\.(heic|heif)$/i.test(file.name || "");
+}
+
+async function heicToJpeg(file) {
+  const heic2any = await loadHeic2Any();
+  const out = await heic2any({ blob: file, toType: "image/jpeg", quality: JPEG_QUALITY });
+  const blob = Array.isArray(out) ? out[0] : out;
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+}
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -239,23 +272,71 @@ async function compressImage(file) {
 }
 
 async function prepareUploadFile(file, row) {
-  if (!shouldCompress(file)) {
-    return { uploadFile: file, contentType: file.type || "application/octet-stream" };
+  let working = file;
+  let originalSize = file.size;
+
+  if (isHeic(file)) {
+    setStatusCell(row.statusTd, "Converting HEIC…");
+    try {
+      working = await heicToJpeg(file);
+    } catch (err) {
+      console.warn("HEIC conversion failed, uploading original.", err);
+      // Server may still accept image/heic, so fall through with original.
+      return { uploadFile: file, contentType: file.type || "image/heic" };
+    }
   }
 
-  row.statusTd.textContent = "Optimizing…";
+  if (!shouldCompress(working)) {
+    return { uploadFile: working, contentType: working.type || "application/octet-stream" };
+  }
+
+  setStatusCell(row.statusTd, "Optimizing…");
 
   try {
-    const compressed = await compressImage(file);
-    if (compressed.size < file.size) {
+    const compressed = await compressImage(working);
+    if (compressed.size < working.size) {
       row.sizeEl.textContent = `${formatBytes(compressed.size)} (optimized)`;
-      return { uploadFile: compressed, contentType: compressed.type || file.type };
+      return { uploadFile: compressed, contentType: compressed.type || working.type };
     }
   } catch (err) {
     console.warn("Image optimization failed, uploading original.", err);
   }
 
-  return { uploadFile: file, contentType: file.type || "application/octet-stream" };
+  if (working.size < originalSize) {
+    row.sizeEl.textContent = `${formatBytes(working.size)} (converted)`;
+  }
+  return { uploadFile: working, contentType: working.type || "application/octet-stream" };
+}
+
+function isRetryableUploadError(err) {
+  if (!err) return false;
+  if (err.message === "Unauthorized") return false;
+  if (typeof err.status === "number") {
+    return err.status >= 500 || err.status === 0;
+  }
+  // Network / unknown — assume transient.
+  return true;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function uploadWithRetry(file, row, contentType, password, uploaderName) {
+  let lastErr;
+  for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await uploadFileXHR(file, row, contentType, password, uploaderName);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === UPLOAD_MAX_ATTEMPTS || !isRetryableUploadError(err)) throw err;
+      const backoffMs = 800 * Math.pow(2, attempt - 1);
+      setStatusCell(row.statusTd, `Retrying (${attempt}/${UPLOAD_MAX_ATTEMPTS - 1})…`);
+      row.bar.style.width = "0%";
+      await sleep(backoffMs);
+    }
+  }
+  throw lastErr;
 }
 
 function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderName) {
@@ -284,20 +365,26 @@ function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderN
     xhr.onload = () => {
       if (xhr.status === 401 || xhr.status === 403) {
         setStatusCell(statusTd, "Wrong password", "❌");
-        reject(new Error("Unauthorized"));
+        const err = new Error("Unauthorized");
+        err.status = xhr.status;
+        reject(err);
       } else if (xhr.status >= 200 && xhr.status < 300) {
         bar.style.width = "100%";
         setStatusCell(statusTd, "Done", "✅");
         resolve();
       } else {
         setStatusCell(statusTd, `Failed (${xhr.status})`, "❌");
-        reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+        const err = new Error(xhr.responseText || `Upload failed (${xhr.status})`);
+        err.status = xhr.status;
+        reject(err);
       }
     };
 
     xhr.onerror = () => {
       setStatusCell(statusTd, "Network error", "❌");
-      reject(new Error("Network error"));
+      const err = new Error("Network error");
+      err.status = 0;
+      reject(err);
     };
 
     xhr.send(file);
@@ -356,7 +443,7 @@ uploadBtn.addEventListener("click", async () => {
     }
     return async () => {
       const { uploadFile, contentType } = await prepareUploadFile(file, row);
-      return uploadFileXHR(uploadFile, row, contentType, password, uploaderName);
+      return uploadWithRetry(uploadFile, row, contentType, password, uploaderName);
     };
   });
 
