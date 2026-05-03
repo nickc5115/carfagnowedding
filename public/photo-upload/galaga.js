@@ -16,7 +16,6 @@
   const PLAYER_FIRE_COOLDOWN = 0.18;
   const RESPAWN_DELAY = 1.4;
   const BULLET_LIMIT_SINGLE = 1;
-  const BULLET_LIMIT_DUAL = 2;
 
   const COLS = 8;
   const ROWS = 5;
@@ -93,8 +92,6 @@
     hit:         () => bleep(220,  0.10, "triangle", 0.07, 110),
     explode:     () => { bleep(140, 0.30, "square", 0.08, 40); bleep(80, 0.32, "sawtooth", 0.05, 30); },
     dive:        () => bleep(660,  0.18, "square",   0.04, 220),
-    capture:     () => { bleep(440, 0.5, "sine", 0.05, 880); bleep(660, 0.5, "sine", 0.04, 1100); },
-    rescue:      () => { bleep(660, 0.2, "square", 0.06, 990); bleep(990, 0.25, "square", 0.06, 1320); },
     stage:       () => { bleep(523, 0.12, "square", 0.07); setTimeout(() => bleep(659, 0.12, "square", 0.07), 130); setTimeout(() => bleep(784, 0.16, "square", 0.07), 270); },
     extraLife:   () => { bleep(523, 0.1, "square", 0.06); setTimeout(() => bleep(784, 0.1, "square", 0.06), 110); setTimeout(() => bleep(1046, 0.14, "square", 0.06), 220); },
     gameOver:    () => { bleep(330, 0.4, "sawtooth", 0.07, 110); }
@@ -125,7 +122,6 @@
   let formationT = 0;
   let attackerTimer = 0;
   let pendingAttackers = 0;
-  let capturedShip = null; // { bossId } reference to boss carrying our ship
 
   const keys = { left: false, right: false, fire: false };
   const touch = { active: false, x: W / 2, fire: false };
@@ -152,9 +148,6 @@
       y: H - 70,
       alive: true,
       respawnAt: 0,
-      dual: false,
-      capturing: false,
-      lostToCapture: false,
       invuln: 1.6 // post-spawn grace period (seconds)
     };
   }
@@ -164,7 +157,7 @@
   // enemy that was already mid-dive.
   function recallAttackers() {
     for (const e of enemies) {
-      if (e.mode === "attack" || e.mode === "tractor") {
+      if (e.mode === "attack") {
         const slot = slotPos(e.slotCol, e.slotRow, formationT);
         e.path = {
           p0: { x: e.x, y: e.y },
@@ -176,8 +169,6 @@
         e.mode = "returning";
         e.modeT = 0;
         e.angle = 0;
-        e.attackBeam = 0;
-        e.tractorPlanned = false;
       }
     }
   }
@@ -195,12 +186,10 @@
       x: 0,
       y: 0,
       angle: 0,
-      mode: "intro",             // intro | formation | attack | tractor | returning | dying
+      mode: "intro",             // intro | formation | attack | returning | dying
       modeT: 0,
       path: null,                 // current bezier path
       pathDur: 0,
-      attackBeam: 0,              // tractor beam open progress 0..1
-      carriesPlayer: false,
       escortOf: null,             // boss id this is escorting
       fireCooldown: rand(0.6, 1.6)
     };
@@ -286,10 +275,6 @@
     const p3 = { x: exitX, y: H + 40 };
     e.path = { p0, p1, p2, p3 };
     e.pathDur = 2.4 + Math.random() * 0.6;
-    // Boss occasionally goes for tractor beam at top.
-    if (e.kind === "boss" && !capturedShip && !player.dual && Math.random() < 0.35) {
-      e.tractorPlanned = true;
-    }
     sfx.dive();
   }
 
@@ -311,13 +296,11 @@
   // ---------- Bullets / particles ----------
   function tryFire() {
     if (!player || !player.alive) return;
-    const limit = player.dual ? BULLET_LIMIT_DUAL : BULLET_LIMIT_SINGLE;
-    if (bullets.length >= limit) return;
+    if (bullets.length >= BULLET_LIMIT_SINGLE) return;
     const now = performance.now() / 1000;
     if (now - lastFireAt < PLAYER_FIRE_COOLDOWN) return;
     lastFireAt = now;
     bullets.push({ x: player.x, y: player.y - 12, vy: -PLAYER_BULLET_SPEED });
-    if (player.dual) bullets.push({ x: player.x - 28, y: player.y - 12, vy: -PLAYER_BULLET_SPEED });
     sfx.shoot();
   }
 
@@ -359,6 +342,7 @@
       return;
     }
 
+
     // Player
     updatePlayer(dt);
 
@@ -396,20 +380,10 @@
       stateTimer = 1.8;
       sfx.stage();
     }
-
-    // Capture flow
-    if (state === "captured") {
-      stateTimer -= dt;
-      if (stateTimer <= 0) {
-        // Finish the lost life and continue.
-        loseLifeFinal();
-        state = "playing";
-      }
-    }
   }
 
   function allInFormation() {
-    return enemies.every((e) => e.mode === "formation" || e.mode === "attack" || e.mode === "tractor" || e.mode === "returning");
+    return enemies.every((e) => e.mode === "formation" || e.mode === "attack" || e.mode === "returning");
   }
 
   function updatePlayer(dt) {
@@ -428,7 +402,6 @@
         // Respawn — clear bullets and pull any divers back to formation
         // so the new ship gets a fair chance.
         player = newPlayer();
-        if (capturedShip) player.lostToCapture = true; // visual only
         enemyBullets = [];
         recallAttackers();
       }
@@ -493,16 +466,6 @@
         if (Math.random() < 0.55) fireEnemyBullet(e);
         e.fireCooldown = rand(0.4, 0.9);
       }
-      // Boss tractor checkpoint
-      if (e.tractorPlanned && t > 0.4 && t < 0.5) {
-        e.mode = "tractor";
-        e.modeT = 0;
-        e.attackBeam = 0;
-        e.tractorPlanned = false;
-        e.x = clamp(e.x, 80, W - 80);
-        e.angle = Math.PI; // upside down
-        sfx.capture();
-      }
       if (t >= 1) {
         // Re-enter formation: spawn a return path from top.
         const slot = slotPos(e.slotCol, e.slotRow, formationT);
@@ -514,48 +477,6 @@
         e.pathDur = 1.5;
         e.mode = "returning";
         e.modeT = 0;
-      }
-    } else if (e.mode === "tractor") {
-      // Sit at top with beam open for a few seconds.
-      e.attackBeam = clamp(e.modeT / 0.6, 0, 1);
-      // Beam check: triangle from boss down to the floor.
-      if (player && player.alive && !player.capturing && player.invuln <= 0 && e.modeT > 0.6 && e.modeT < 2.4) {
-        const beamLen = Math.max(120, H - 30 - e.y);
-        const beamHalf = lerp(18, 140, clamp((player.y - e.y) / beamLen, 0, 1));
-        if (Math.abs(player.x - e.x) < beamHalf && player.y > e.y + 20 && player.y < H) {
-          // Start capturing
-          player.capturing = true;
-          player.captureBoss = e;
-          e.carriesPlayer = true;
-          capturedShip = { bossId: e.id };
-        }
-      }
-      // Animate captured ship rising into boss.
-      if (player && player.capturing) {
-        player.y = lerp(player.y, e.y + 24, 4 * dt);
-        player.x = lerp(player.x, e.x, 4 * dt);
-        if (Math.abs(player.y - (e.y + 24)) < 2) {
-          // Capture complete; player ship is "consumed" — lose a life as if hit.
-          player.alive = false;
-          player.respawnAt = RESPAWN_DELAY;
-          state = "captured";
-          stateTimer = 0.6;
-          lives -= 1;
-          // Boss returns to formation carrying ship marker.
-        }
-      }
-      if (e.modeT > 3.5) {
-        // Beam closes; boss returns to formation.
-        const slot = slotPos(e.slotCol, e.slotRow, formationT);
-        const p0 = { x: e.x, y: e.y };
-        const p1 = { x: slot.x, y: 60 };
-        const p2 = { x: slot.x, y: slot.y - 40 };
-        const p3 = { x: slot.x, y: slot.y };
-        e.path = { p0, p1, p2, p3 };
-        e.pathDur = 1.4;
-        e.mode = "returning";
-        e.modeT = 0;
-        e.angle = 0;
       }
     } else if (e.mode === "returning") {
       const t = clamp(e.modeT / e.pathDur, 0, 1);
@@ -569,19 +490,6 @@
     } else if (e.mode === "dying") {
       // Already exploding visually; particles handle the FX.
     }
-  }
-
-  function loseLifeFinal() {
-    // After capture, respawn ship if lives remain.
-    if (lives <= 0) {
-      state = "game-over";
-      sfx.gameOver();
-      if (hiscore > 0) try { localStorage.setItem(HISCORE_KEY, String(hiscore)); } catch (_) {}
-      return;
-    }
-    player = newPlayer();
-    enemyBullets = [];
-    recallAttackers();
   }
 
   // ---------- Collisions ----------
@@ -606,7 +514,7 @@
       }
     }
     // Enemy bullets vs player
-    if (player && player.alive && !player.capturing && player.invuln <= 0) {
+    if (player && player.alive && player.invuln <= 0) {
       for (const b of enemyBullets) {
         const dx = b.x - player.x;
         const dy = b.y - player.y;
@@ -631,7 +539,7 @@
   }
 
   function killEnemy(e) {
-    const wasAttacking = e.mode === "attack" || e.mode === "tractor" || e.mode === "returning";
+    const wasAttacking = e.mode === "attack" || e.mode === "returning";
     let pts;
     if (e.kind === "bee") pts = wasAttacking ? POINTS.beeDive : POINTS.bee;
     else if (e.kind === "butterfly") pts = wasAttacking ? POINTS.butterflyDive : POINTS.butterfly;
@@ -639,34 +547,16 @@
     addScore(pts);
     const color = e.kind === "bee" ? "#c89968" : e.kind === "butterfly" ? "#e64545" : "#33cc66";
     explode(e.x, e.y, color, e.kind === "boss" ? 28 : 18);
-    // Was this the boss carrying our captured ship? Rescue!
-    if (e.carriesPlayer && capturedShip && capturedShip.bossId === e.id) {
-      addScore(1000); // bonus
-      capturedShip = null;
-      sfx.rescue();
-      // If a player ship is currently on the field, dual-up.
-      if (player && player.alive) {
-        player.dual = true;
-      } else {
-        // Keep dual flag for next respawn? Simplest: grant on next spawn via sentinel.
-        pendingDualOnRespawn = true;
-      }
-    }
     e.mode = "dying";
     e.modeT = 0;
   }
-  let pendingDualOnRespawn = false;
 
   function killPlayer() {
     if (!player || !player.alive) return;
     explode(player.x, player.y, "#fff", 26);
     player.alive = false;
     player.respawnAt = RESPAWN_DELAY;
-    player.dual = false;
     lives -= 1;
-    if (lives <= 0) {
-      // Defer state change; player.respawnAt countdown handles it.
-    }
   }
 
   // ---------- Drawing ----------
@@ -678,8 +568,6 @@
       ctx.fillStyle = `rgba(255,255,255,${s.b})`;
       ctx.fillRect(s.x | 0, s.y | 0, 1, 2);
     }
-    // Tractor beams (behind enemies)
-    for (const e of enemies) if (e.mode === "tractor") drawBeam(e);
     // Enemies
     for (const e of enemies) drawEnemy(e);
     // Bullets
@@ -698,7 +586,7 @@
     // Player (flicker while invulnerable)
     if (player && player.alive) {
       const flicker = player.invuln > 0 && Math.floor(player.invuln * 16) % 2 === 0;
-      if (!flicker) drawShip(player.x, player.y, player.dual, player.capturing);
+      if (!flicker) drawShip(player.x, player.y);
     }
     // HUD
     drawHud();
@@ -772,15 +660,8 @@
     ctx.fillText(`STAGE ${stage + 1}`, W / 2, H / 2);
   }
 
-  function drawShip(x, y, dual, capturing) {
-    if (capturing) {
-      // Slight tilt + tint while being lifted.
-      ctx.save();
-      ctx.globalAlpha = 0.75;
-    }
+  function drawShip(x, y) {
     drawShipBody(x, y);
-    if (dual) drawShipBody(x - 28, y);
-    if (capturing) ctx.restore();
   }
   function drawShipBody(x, y) {
     ctx.fillStyle = "#fff";
@@ -915,45 +796,6 @@
     ctx.fillStyle = "#67d4ff";
     ctx.fillRect(-9, -2, 2, 2);
     ctx.fillRect(7, -2, 2, 2);
-    if (e.carriesPlayer) {
-      // Captured ship hanging below the boss
-      ctx.save();
-      ctx.translate(0, 24);
-      ctx.scale(1, -1); // mirror so it looks captured (upside down)
-      drawShipBody(0, 0);
-      ctx.restore();
-    }
-  }
-
-  function drawBeam(e) {
-    const a = e.attackBeam;
-    if (a <= 0) return;
-    const beamLen = Math.max(120, H - 30 - e.y);
-    const baseY = e.y + beamLen;
-    const baseHalf = 140 * a;
-    const grad = ctx.createLinearGradient(e.x, e.y, e.x, baseY);
-    grad.addColorStop(0, "rgba(255,225,77,0.9)");
-    grad.addColorStop(1, "rgba(255,225,77,0)");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(e.x - 12, e.y + 4);
-    ctx.lineTo(e.x + 12, e.y + 4);
-    ctx.lineTo(e.x + baseHalf, baseY);
-    ctx.lineTo(e.x - baseHalf, baseY);
-    ctx.closePath();
-    ctx.fill();
-    // Animated stripes
-    const phase = (performance.now() / 80) % 24;
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = 1;
-    for (let yy = phase; yy < beamLen; yy += 24) {
-      const f = yy / beamLen;
-      const half = lerp(12, baseHalf, f);
-      ctx.beginPath();
-      ctx.moveTo(e.x - half, e.y + 4 + yy);
-      ctx.lineTo(e.x + half, e.y + 4 + yy);
-      ctx.stroke();
-    }
   }
 
   // ---------- Main loop ----------
@@ -972,8 +814,6 @@
     lives = 3;
     stage = 0;
     nextExtraAt = POINTS_PER_LIFE;
-    capturedShip = null;
-    pendingDualOnRespawn = false;
     bullets = []; enemyBullets = []; particles = [];
     player = newPlayer();
     startStage(1);
@@ -985,7 +825,6 @@
     attackerTimer = 1.6;
     spawnFormation();
     if (player && !player.alive) player = newPlayer();
-    if (pendingDualOnRespawn && player) { player.dual = true; pendingDualOnRespawn = false; }
   }
 
   // ---------- Input ----------
