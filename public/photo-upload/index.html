@@ -323,13 +323,12 @@
       position: fixed;
       top: 0;
       left: 0;
+      /* width and height are set in JS via window.visualViewport so we
+         always match the truly-visible area on iOS Safari/Chrome
+         regardless of URL-bar state. CSS fallback in case JS hasn't
+         run yet. */
       width: 100vw;
-      /* Use small viewport height as a fallback (assumes URL bar visible)
-         and dynamic viewport height where supported (iOS 15.4+, recent
-         Chrome/Firefox). Both keep the overlay strictly inside the
-         visible viewport — never behind Safari's chrome. */
-      height: 100svh;
-      height: 100dvh;
+      height: 100vh;
       background: #000;
       display: flex;
       align-items: center;
@@ -338,12 +337,12 @@
       touch-action: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Reserve space for notch + home indicator so the canvas centers
-         within the safe area. Buttons get their own safe-area math. */
+      /* Reserve space at top for the close/mute button row and respect
+         the iPhone notch + home indicator. */
       padding:
-        calc(env(safe-area-inset-top) + 56px)
+        calc(env(safe-area-inset-top) + 64px)
         env(safe-area-inset-right)
-        calc(env(safe-area-inset-bottom) + 12px)
+        calc(env(safe-area-inset-bottom) + 16px)
         env(safe-area-inset-left);
       box-sizing: border-box;
     }

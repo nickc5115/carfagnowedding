@@ -906,16 +906,28 @@
     muteBtn = document.getElementById("galagaMute");
   }
 
-  // Letterbox the 480x720 playfield into whatever the overlay's content
-  // box currently is. Re-run on every resize / orientation change /
-  // iOS Safari URL-bar collapse, so HUD and lives never get clipped.
+  // Force the overlay to match the actually-visible viewport. iOS Safari
+  // and Chrome don't always respect 100dvh / 100vh — visualViewport is
+  // the only reliable signal. Then letterbox the 480x720 playfield into
+  // the overlay's content box (everything inside its padding).
+  function sizeOverlay() {
+    if (!overlay) return;
+    const vv = window.visualViewport;
+    const w = vv ? vv.width : window.innerWidth;
+    const h = vv ? vv.height : window.innerHeight;
+    overlay.style.width = w + "px";
+    overlay.style.height = h + "px";
+    fitCanvas();
+  }
+
   function fitCanvas() {
     if (!canvas || !overlay) return;
     const r = overlay.getBoundingClientRect();
-    const padTop = parseFloat(getComputedStyle(overlay).paddingTop) || 0;
-    const padBottom = parseFloat(getComputedStyle(overlay).paddingBottom) || 0;
-    const padLeft = parseFloat(getComputedStyle(overlay).paddingLeft) || 0;
-    const padRight = parseFloat(getComputedStyle(overlay).paddingRight) || 0;
+    const cs = getComputedStyle(overlay);
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const padLeft = parseFloat(cs.paddingLeft) || 0;
+    const padRight = parseFloat(cs.paddingRight) || 0;
     const availW = Math.max(1, r.width - padLeft - padRight);
     const availH = Math.max(1, r.height - padTop - padBottom);
     const ar = W / H;
@@ -932,8 +944,12 @@
   function attachInput() {
     window.addEventListener("keydown", onKeyDown, { passive: false });
     window.addEventListener("keyup", onKeyUp, { passive: false });
-    window.addEventListener("resize", fitCanvas);
-    window.addEventListener("orientationchange", fitCanvas);
+    window.addEventListener("resize", sizeOverlay);
+    window.addEventListener("orientationchange", sizeOverlay);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", sizeOverlay);
+      window.visualViewport.addEventListener("scroll", sizeOverlay);
+    }
     canvas.addEventListener("touchstart", onTouchStart, { passive: false });
     canvas.addEventListener("touchmove", onTouchMove, { passive: false });
     canvas.addEventListener("touchend", onTouchEnd, { passive: false });
@@ -945,8 +961,12 @@
   function detachInput() {
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
-    window.removeEventListener("resize", fitCanvas);
-    window.removeEventListener("orientationchange", fitCanvas);
+    window.removeEventListener("resize", sizeOverlay);
+    window.removeEventListener("orientationchange", sizeOverlay);
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener("resize", sizeOverlay);
+      window.visualViewport.removeEventListener("scroll", sizeOverlay);
+    }
     canvas.removeEventListener("touchstart", onTouchStart);
     canvas.removeEventListener("touchmove", onTouchMove);
     canvas.removeEventListener("touchend", onTouchEnd);
@@ -976,7 +996,10 @@
     if (running) return;
     bootCanvas();
     overlay.hidden = false;
-    fitCanvas();
+    sizeOverlay();
+    // Run once more on next frame in case the URL bar collapses after
+    // the overlay appears (iOS Safari fires visualViewport.resize then).
+    requestAnimationFrame(sizeOverlay);
     try { hiscore = Number(localStorage.getItem(HISCORE_KEY) || "0") || 0; } catch (_) { hiscore = 0; }
     initStars();
     score = 0;
