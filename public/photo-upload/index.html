@@ -10,7 +10,7 @@
     placeholder, the widget will show an error and the auth gate will
     refuse to submit (the script also handles a no-Turnstile case).
   -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onloadTurnstileCallback" async defer></script>
 
   <style>
     :root {
