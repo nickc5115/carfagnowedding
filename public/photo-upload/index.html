@@ -321,7 +321,15 @@
     }
     .galaga-overlay {
       position: fixed;
-      inset: 0;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      /* Use small viewport height as a fallback (assumes URL bar visible)
+         and dynamic viewport height where supported (iOS 15.4+, recent
+         Chrome/Firefox). Both keep the overlay strictly inside the
+         visible viewport — never behind Safari's chrome. */
+      height: 100svh;
+      height: 100dvh;
       background: #000;
       display: flex;
       align-items: center;
@@ -330,10 +338,13 @@
       touch-action: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Respect iPhone notch + home indicator + Safari URL bar so the
-         HUD at the top of the canvas and lives at the bottom aren't
-         clipped by browser chrome. */
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      /* Reserve space for notch + home indicator so the canvas centers
+         within the safe area. Buttons get their own safe-area math. */
+      padding:
+        calc(env(safe-area-inset-top) + 56px)
+        env(safe-area-inset-right)
+        calc(env(safe-area-inset-bottom) + 12px)
+        env(safe-area-inset-left);
       box-sizing: border-box;
     }
     .galaga-overlay[hidden] { display: none; }
@@ -359,11 +370,21 @@
       text-align: center;
       cursor: pointer;
       padding: 0;
-      z-index: 1;
+      z-index: 10000;
     }
     .galaga-btn:hover { background: rgba(40, 40, 40, 0.7); }
-    .galaga-close { top: 12px; right: 12px; font-size: 26px; }
-    .galaga-mute  { top: 12px; left: 12px; font-size: 18px; }
+    /* Offset by safe-area insets so buttons sit clear of the iPhone notch
+       / Dynamic Island and aren't covered by Safari's URL bar. */
+    .galaga-close {
+      top: calc(env(safe-area-inset-top) + 12px);
+      right: calc(env(safe-area-inset-right) + 12px);
+      font-size: 26px;
+    }
+    .galaga-mute {
+      top: calc(env(safe-area-inset-top) + 12px);
+      left: calc(env(safe-area-inset-left) + 12px);
+      font-size: 18px;
+    }
   </style>
 </head>
 
