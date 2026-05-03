@@ -337,12 +337,13 @@
       touch-action: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Reserve space at the BOTTOM for the close/mute button row
-         (top URL bar / notch is unreliable territory on iOS Safari). */
+      /* Just respect notch + home indicator. Buttons float over the
+         canvas in the bottom corners so the playfield can use the full
+         available height. */
       padding:
         calc(env(safe-area-inset-top) + 16px)
         env(safe-area-inset-right)
-        calc(env(safe-area-inset-bottom) + 72px)
+        calc(env(safe-area-inset-bottom) + 16px)
         env(safe-area-inset-left);
       box-sizing: border-box;
     }
