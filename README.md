@@ -101,9 +101,20 @@ If the binding is missing, the rate limiter is skipped.
 | `X-Upload-Password` | yes | Shared password, compared in constant time |
 | `X-Uploader-Name` | no | Used in the R2 key for attribution |
 | `X-Original-Name` | no | Original filename, sanitized into the R2 key |
+| `X-Content-Hash` | no | SHA-256 (hex) of the body. Enables dedup short-circuit. |
 | `Content-Type` | no | Detected server-side via magic bytes; this header is ignored for type validation |
 
 Body: raw image bytes. Server validates the file is a real image
 (JPEG/PNG/GIF/WebP/HEIC/HEIF) and rejects payloads larger than 25MB.
 
 R2 key format: `uploads/<YYYY-MM-DD>/<uploader>-<uuid>-<original>`.
+
+### Dedup
+
+If the client sends `X-Content-Hash` (SHA-256 hex of the bytes about to be
+uploaded), the server checks for a marker at `dedup/<hash>` in R2 *before*
+reading the body. If the marker exists, the server responds
+`200 {"ok": true, "deduped": true}` and Cloudflare drops the unread upload —
+no R2 write, no bandwidth cost. After a successful first-time upload, the
+server re-hashes server-side (so a malicious client can't poison the dedup
+table) and writes the marker for next time.
