@@ -181,7 +181,16 @@ function shouldCompress(file) {
   return file.size >= COMPRESS_MIN_BYTES;
 }
 
-function loadImage(file) {
+async function loadOrientedBitmap(file) {
+  // createImageBitmap with imageOrientation:"from-image" applies EXIF rotation
+  // so portrait phone photos stay upright after canvas re-encode.
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (err) {
+      // Fall through to <img> fallback (older Safari etc.)
+    }
+  }
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -198,22 +207,25 @@ function loadImage(file) {
 }
 
 async function compressImage(file) {
-  const img = await loadImage(file);
+  const source = await loadOrientedBitmap(file);
+  const srcW = source.width;
+  const srcH = source.height;
   const maxDim = MAX_DIM;
-  let targetW = img.width;
-  let targetH = img.height;
+  let targetW = srcW;
+  let targetH = srcH;
 
-  if (img.width > maxDim || img.height > maxDim) {
-    const scale = Math.min(maxDim / img.width, maxDim / img.height);
-    targetW = Math.round(img.width * scale);
-    targetH = Math.round(img.height * scale);
+  if (srcW > maxDim || srcH > maxDim) {
+    const scale = Math.min(maxDim / srcW, maxDim / srcH);
+    targetW = Math.round(srcW * scale);
+    targetH = Math.round(srcH * scale);
   }
 
   const canvas = document.createElement("canvas");
   canvas.width = targetW;
   canvas.height = targetH;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, targetW, targetH);
+  ctx.drawImage(source, 0, 0, targetW, targetH);
+  if (typeof source.close === "function") source.close();
 
   const blob = await new Promise((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
