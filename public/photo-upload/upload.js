@@ -110,7 +110,8 @@ const turnstileEnabled = !!(turnstileEl && turnstileSiteKey && turnstileSiteKey 
 let turnstileWidgetId = null;
 
 function renderTurnstile() {
-  if (!turnstileEnabled || !window.turnstile || turnstileWidgetId !== null) return;
+  if (!turnstileEnabled || turnstileWidgetId !== null) return;
+  if (!window.turnstile || typeof window.turnstile.render !== "function") return;
   turnstileWidgetId = window.turnstile.render(turnstileEl, {
     sitekey: turnstileSiteKey,
     theme: "light"
@@ -127,21 +128,16 @@ function resetTurnstile() {
   window.turnstile.reset(turnstileWidgetId);
 }
 
+// Turnstile api.js is loaded with ?render=explicit&onload=onloadTurnstileCallback,
+// so it will invoke this global once the library is ready to render widgets.
 window.onloadTurnstileCallback = renderTurnstile;
-// Cloudflare's api.js calls window.onloadTurnstileCallback if present, but
-// since we load it without that param we render on a short interval.
-if (turnstileEnabled) {
-  const tryRender = () => {
-    if (window.turnstile) {
-      renderTurnstile();
-    } else {
-      setTimeout(tryRender, 100);
-    }
-  };
-  tryRender();
-} else if (turnstileEl) {
+
+if (!turnstileEnabled && turnstileEl) {
   // Hide the empty container so it doesn't add blank space.
   turnstileEl.style.display = "none";
+} else if (turnstileEnabled && window.turnstile && typeof window.turnstile.render === "function") {
+  // Edge case: api.js finished loading before this script ran.
+  renderTurnstile();
 }
 
 function initAuthGate() {
