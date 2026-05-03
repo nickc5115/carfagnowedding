@@ -154,8 +154,32 @@
       respawnAt: 0,
       dual: false,
       capturing: false,
-      lostToCapture: false
+      lostToCapture: false,
+      invuln: 1.6 // post-spawn grace period (seconds)
     };
+  }
+
+  // Send any active attacker back to its formation slot. Used after a
+  // life is lost so the new ship doesn't immediately collide with an
+  // enemy that was already mid-dive.
+  function recallAttackers() {
+    for (const e of enemies) {
+      if (e.mode === "attack" || e.mode === "tractor") {
+        const slot = slotPos(e.slotCol, e.slotRow, formationT);
+        e.path = {
+          p0: { x: e.x, y: e.y },
+          p1: { x: slot.x, y: Math.max(60, e.y - 80) },
+          p2: { x: slot.x, y: slot.y - 40 },
+          p3: { x: slot.x, y: slot.y }
+        };
+        e.pathDur = 1.2;
+        e.mode = "returning";
+        e.modeT = 0;
+        e.angle = 0;
+        e.attackBeam = 0;
+        e.tractorPlanned = false;
+      }
+    }
   }
 
   // ---------- Enemies ----------
@@ -390,6 +414,7 @@
 
   function updatePlayer(dt) {
     if (!player) return;
+    if (player.invuln > 0) player.invuln -= dt;
     if (!player.alive) {
       player.respawnAt -= dt;
       if (player.respawnAt <= 0) {
@@ -400,9 +425,12 @@
           if (hiscore > 0) try { localStorage.setItem(HISCORE_KEY, String(hiscore)); } catch (_) {}
           return;
         }
-        // Respawn
+        // Respawn — clear bullets and pull any divers back to formation
+        // so the new ship gets a fair chance.
         player = newPlayer();
         if (capturedShip) player.lostToCapture = true; // visual only
+        enemyBullets = [];
+        recallAttackers();
       }
       return;
     }
@@ -491,7 +519,7 @@
       // Sit at top with beam open for a few seconds.
       e.attackBeam = clamp(e.modeT / 0.6, 0, 1);
       // Beam check: triangle from boss down to the floor.
-      if (player && player.alive && !player.capturing && e.modeT > 0.6 && e.modeT < 2.4) {
+      if (player && player.alive && !player.capturing && player.invuln <= 0 && e.modeT > 0.6 && e.modeT < 2.4) {
         const beamLen = Math.max(120, H - 30 - e.y);
         const beamHalf = lerp(18, 140, clamp((player.y - e.y) / beamLen, 0, 1));
         if (Math.abs(player.x - e.x) < beamHalf && player.y > e.y + 20 && player.y < H) {
@@ -552,6 +580,8 @@
       return;
     }
     player = newPlayer();
+    enemyBullets = [];
+    recallAttackers();
   }
 
   // ---------- Collisions ----------
@@ -576,7 +606,7 @@
       }
     }
     // Enemy bullets vs player
-    if (player && player.alive && !player.capturing) {
+    if (player && player.alive && !player.capturing && player.invuln <= 0) {
       for (const b of enemyBullets) {
         const dx = b.x - player.x;
         const dy = b.y - player.y;
@@ -665,8 +695,11 @@
       ctx.fillRect((p.x | 0) - 1, (p.y | 0) - 1, 3, 3);
     }
     ctx.globalAlpha = 1;
-    // Player
-    if (player && player.alive) drawShip(player.x, player.y, player.dual, player.capturing);
+    // Player (flicker while invulnerable)
+    if (player && player.alive) {
+      const flicker = player.invuln > 0 && Math.floor(player.invuln * 16) % 2 === 0;
+      if (!flicker) drawShip(player.x, player.y, player.dual, player.capturing);
+    }
     // HUD
     drawHud();
     // Overlays
@@ -706,7 +739,7 @@
     ctx.fillText("GALAGA", W / 2, H / 2 - 40);
     ctx.fillStyle = "#fff";
     ctx.font = "bold 14px monospace";
-    ctx.fillText("S & N WEDDING EDITION", W / 2, H / 2);
+    ctx.fillText("Sam & Nick WEDDING EDITION", W / 2, H / 2);
     ctx.fillStyle = "#ffe14d";
     ctx.font = "14px monospace";
     const blink = (Math.sin(performance.now() / 300) > 0);
