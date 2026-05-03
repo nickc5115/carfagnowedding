@@ -364,6 +364,18 @@ async function prepareUploadFile(file, row) {
   return { uploadFile: working, contentType: working.type || "application/octet-stream" };
 }
 
+async function sha256Hex(blob) {
+  if (!crypto || !crypto.subtle) return "";
+  const buf = await blob.arrayBuffer();
+  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+  const bytes = new Uint8Array(hashBuf);
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
 function isRetryableUploadError(err) {
   if (!err) return false;
   if (err.message === "Unauthorized") return false;
@@ -378,11 +390,11 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function uploadWithRetry(file, row, contentType, password, uploaderName) {
+async function uploadWithRetry(file, row, contentType, password, uploaderName, contentHash) {
   let lastErr;
   for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
     try {
-      return await uploadFileXHR(file, row, contentType, password, uploaderName);
+      return await uploadFileXHR(file, row, contentType, password, uploaderName, contentHash);
     } catch (err) {
       lastErr = err;
       if (attempt === UPLOAD_MAX_ATTEMPTS || !isRetryableUploadError(err)) throw err;
@@ -395,7 +407,7 @@ async function uploadWithRetry(file, row, contentType, password, uploaderName) {
   throw lastErr;
 }
 
-function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderName) {
+function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderName, contentHash) {
   return new Promise((resolve, reject) => {
     setStatusCell(statusTd, "Uploading…");
 
@@ -410,6 +422,9 @@ function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderN
     if (uploaderName) {
       xhr.setRequestHeader("X-Uploader-Name", uploaderName);
       xhr.setRequestHeader("X-Original-Name", file.name);
+    }
+    if (contentHash) {
+      xhr.setRequestHeader("X-Content-Hash", contentHash);
     }
 
     xhr.upload.onprogress = (evt) => {
@@ -426,7 +441,12 @@ function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderN
         reject(err);
       } else if (xhr.status >= 200 && xhr.status < 300) {
         bar.style.width = "100%";
-        setStatusCell(statusTd, "Done", "✅");
+        let deduped = false;
+        try {
+          const body = JSON.parse(xhr.responseText || "{}");
+          deduped = body && body.deduped === true;
+        } catch (_) { /* ignore non-JSON success bodies */ }
+        setStatusCell(statusTd, deduped ? "Already uploaded" : "Done", "✅");
         resolve();
       } else {
         setStatusCell(statusTd, `Failed (${xhr.status})`, "❌");
@@ -499,7 +519,14 @@ uploadBtn.addEventListener("click", async () => {
     }
     return async () => {
       const { uploadFile, contentType } = await prepareUploadFile(file, row);
-      return uploadWithRetry(uploadFile, row, contentType, password, uploaderName);
+      let contentHash = "";
+      try {
+        contentHash = await sha256Hex(uploadFile);
+      } catch (err) {
+        // Non-fatal: dedup is an optimization, not a requirement.
+        console.warn("Hashing failed, uploading without dedup hint.", err);
+      }
+      return uploadWithRetry(uploadFile, row, contentType, password, uploaderName, contentHash);
     };
   });
 

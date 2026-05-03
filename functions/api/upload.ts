@@ -124,6 +124,20 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
+  // Dedup: client sends a SHA-256 of the bytes it's about to upload. If we've
+  // already stored a marker for that hash, return early WITHOUT reading the
+  // body — Cloudflare drops the unread upload, saving R2 puts and bandwidth.
+  const claimedHash = (request.headers.get("x-content-hash") || "").toLowerCase()
+  const hashIsValid = /^[0-9a-f]{64}$/.test(claimedHash)
+  if (hashIsValid) {
+    const existing = await env.WEDDING_PHOTOS.head(`dedup/${claimedHash}`)
+    if (existing) {
+      return new Response(JSON.stringify({ ok: true, deduped: true }), {
+        headers: { "Content-Type": "application/json" }
+      })
+    }
+  }
+
   const contentLength = Number(request.headers.get("content-length") || "0")
   if (contentLength > MAX_UPLOAD_BYTES) {
     return new Response(`File too large (max ${MAX_UPLOAD_BYTES} bytes)`, { status: 413 })
@@ -158,6 +172,21 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
   await env.WEDDING_PHOTOS.put(key, buffer, {
     httpMetadata: { contentType: detectedType }
   })
+
+  // Verify and persist a dedup marker. We re-hash server-side so a malicious
+  // client can't poison the dedup table by claiming a hash that doesn't match
+  // the bytes they sent.
+  if (hashIsValid) {
+    const actualHashBuf = await crypto.subtle.digest("SHA-256", buffer)
+    const actualHash = Array.from(new Uint8Array(actualHashBuf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+    if (actualHash === claimedHash) {
+      await env.WEDDING_PHOTOS.put(`dedup/${actualHash}`, key, {
+        httpMetadata: { contentType: "text/plain" }
+      })
+    }
+  }
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" }
