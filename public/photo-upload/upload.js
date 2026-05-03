@@ -1,7 +1,7 @@
 const uploadBtn = document.getElementById("uploadBtn");
 const fileInput = document.getElementById("photos");
 const statusEl = document.getElementById("status");
-const tbody = document.getElementById("uploadTbody");
+const uploadList = document.getElementById("uploadList");
 const authGate = document.getElementById("authGate");
 const authBtn = document.getElementById("authBtn");
 const authPassword = document.getElementById("authPassword");
@@ -200,48 +200,53 @@ function formatBytes(bytes) {
 }
 
 function createRow(file) {
-  const tr = document.createElement("tr");
-  tr.style.borderBottom = "1px solid #f3f3f3";
+  const card = document.createElement("div");
+  card.className = "upload-card";
 
-  const nameTd = document.createElement("td");
-  nameTd.style.padding = "10px 0";
-  nameTd.style.paddingRight = "10px";
-  nameTd.style.overflow = "hidden";
+  const head = document.createElement("div");
+  head.className = "upload-head";
+
+  const nameEl = document.createElement("div");
+  nameEl.className = "upload-name";
   const baseName = file.name.replace(/\.[^.]+$/, "");
-  const displayName = baseName.length > 10 ? `${baseName.slice(0, 10)}…` : baseName;
-  nameTd.innerHTML = `<div style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${displayName}</div>
-                      <div class="size" style="color:#666; font-size:12px;">${formatBytes(file.size)}</div>`;
+  nameEl.textContent = baseName;
+  nameEl.title = file.name;
 
-  const progTd = document.createElement("td");
-  progTd.style.padding = "10px 0";
-  progTd.className = "progressCell";
-  progTd.innerHTML = `
-    <div style="background:#eee; border-radius:999px; height:10px; overflow:hidden; border:1px solid #111; margin:0 auto;">
-      <div class="bar" style="height:10px; width:0%; background:#c9a35a;"></div>
-    </div>
-  `;
+  const statusBadge = document.createElement("div");
+  statusBadge.className = "upload-status";
 
-  const statusTd = document.createElement("td");
-  statusTd.style.padding = "10px 0";
-  statusTd.className = "statusCell";
-  setStatusCell(statusTd, "Pending");
+  head.appendChild(nameEl);
+  head.appendChild(statusBadge);
 
-  tr.appendChild(nameTd);
-  tr.appendChild(progTd);
-  tr.appendChild(statusTd);
+  const meta = document.createElement("div");
+  meta.className = "upload-meta";
+  meta.textContent = formatBytes(file.size);
 
-  const bar = tr.querySelector(".bar");
-  const sizeEl = nameTd.querySelector(".size");
-  return { tr, bar, statusTd, sizeEl };
+  const progress = document.createElement("div");
+  progress.className = "upload-progress";
+  const bar = document.createElement("div");
+  bar.className = "upload-bar";
+  progress.appendChild(bar);
+
+  card.appendChild(head);
+  card.appendChild(meta);
+  card.appendChild(progress);
+
+  const row = { tr: card, bar, statusTd: statusBadge, sizeEl: meta };
+  setStatusCell(statusBadge, "Pending");
+  return row;
 }
 
-function setStatusCell(statusTd, text, emoji = "") {
-  const safeEmoji = emoji ? ` <span class="status-emoji">${emoji}</span>` : "";
-  statusTd.innerHTML = `<span class="status-text">${text}</span>${safeEmoji}`;
+function setStatusCell(badge, text, emoji = "") {
+  const card = badge.closest(".upload-card");
+  if (card) card.classList.remove("is-done", "is-error");
+  if (emoji === "✅" && card) card.classList.add("is-done");
+  if (emoji === "❌" && card) card.classList.add("is-error");
+  badge.textContent = emoji ? `${text} ${emoji}` : text;
 }
 
 function resetTable() {
-  tbody.innerHTML = "";
+  uploadList.innerHTML = "";
   rowsByFile.clear();
 }
 
@@ -250,7 +255,7 @@ function ensureRows(files) {
   files.forEach((file) => {
     const row = createRow(file);
     rowsByFile.set(file, row);
-    tbody.appendChild(row.tr);
+    uploadList.appendChild(row.tr);
   });
 }
 
@@ -446,7 +451,7 @@ function uploadFileXHR(file, { bar, statusTd }, contentType, password, uploaderN
           const body = JSON.parse(xhr.responseText || "{}");
           deduped = body && body.deduped === true;
         } catch (_) { /* ignore non-JSON success bodies */ }
-        setStatusCell(statusTd, deduped ? "Already uploaded" : "Done", "✅");
+        setStatusCell(statusTd, deduped ? "Saved before" : "Done", "✅");
         resolve();
       } else {
         setStatusCell(statusTd, `Failed (${xhr.status})`, "❌");
@@ -515,7 +520,7 @@ uploadBtn.addEventListener("click", async () => {
     const row = rowsByFile.get(file) || createRow(file);
     if (!rowsByFile.has(file)) {
       rowsByFile.set(file, row);
-      tbody.appendChild(row.tr);
+      uploadList.appendChild(row.tr);
     }
     return async () => {
       const { uploadFile, contentType } = await prepareUploadFile(file, row);

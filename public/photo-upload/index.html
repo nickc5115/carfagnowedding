@@ -156,24 +156,67 @@
     button:disabled { background: #9aa8b9; cursor: not-allowed; box-shadow: none; }
     .status { margin-top: 14px; font-weight: 600; color: var(--dusty-blue-dark); }
     .hint { margin-top: 8px; color: #6b7280; font-size: 14px; }
-    table { width: 100%; margin-top: 16px; border-collapse: collapse; table-layout: fixed; }
-    thead th {
-      padding: 8px 6px;
-      border-bottom: 1px solid rgba(201, 163, 90, 0.35);
-      color: var(--dusty-blue-dark);
-      font-weight: 600;
+    .upload-list {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    thead th,
-    tbody td { text-align: center; }
-    .progressCell { text-align: center; }
-    tbody td { padding: 10px 6px; vertical-align: middle; }
-    th.col-file { width: 45%; }
-    th.col-progress { width: 35%; }
-    th.col-status { width: 20%; }
-    .statusCell { white-space: nowrap; }
-    .statusCell .status-text { display: inline; }
-    .statusCell .status-emoji { display: inline; }
-    tbody tr:last-child { border-bottom: none; }
+    .upload-list:empty { margin-top: 0; }
+    .upload-card {
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid rgba(131, 155, 191, 0.28);
+      border-radius: 12px;
+      padding: 12px 14px;
+      transition: border-color 200ms ease, background 200ms ease;
+    }
+    .upload-card.is-done { border-color: rgba(78, 169, 107, 0.45); background: rgba(232, 246, 236, 0.55); }
+    .upload-card.is-error { border-color: rgba(201, 119, 119, 0.55); background: rgba(250, 232, 232, 0.55); }
+    .upload-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .upload-name {
+      flex: 1;
+      min-width: 0;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .upload-status {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dusty-blue-dark);
+      white-space: nowrap;
+    }
+    .upload-card.is-done .upload-status { color: #2f7d4a; }
+    .upload-card.is-error .upload-status { color: #b3334a; }
+    .upload-meta { color: #6b7280; font-size: 12px; margin-top: 2px; }
+    .upload-progress {
+      margin-top: 8px;
+      height: 8px;
+      background: rgba(131, 155, 191, 0.18);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .upload-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--gold), #d6b478);
+      border-radius: 999px;
+      transition: width 220ms ease-out;
+    }
+    .upload-card.is-done .upload-bar { background: linear-gradient(90deg, #4ea96b, #6fbf86); }
+    .upload-card.is-error .upload-bar { background: linear-gradient(90deg, #c97777, #d99090); }
     .footer-note {
       margin-top: 18px;
       padding-top: 12px;
@@ -201,12 +244,9 @@
       h1 { font-size: 24px; }
       .logo { width: 120px; height: 120px; }
       .auth-card { width: min(320px, 88%); }
-      table { font-size: 14px; }
-      th.col-file { width: 44%; }
-      th.col-progress { width: 36%; }
-      th.col-status { width: 20%; }
-      tbody td { padding: 8px 4px; }
-      .statusCell .status-text { display: none; }
+      .upload-card { padding: 10px 12px; }
+      .upload-name { font-size: 13px; }
+      .upload-status { font-size: 11px; }
     }
     .auth-gate {
       position: absolute;
@@ -302,16 +342,7 @@
 
     <div class="status" id="status"></div>
 
-<table id="uploadTable">
-  <thead>
-    <tr>
-      <th class="col-file">File</th>
-      <th class="col-progress">Progress</th>
-      <th class="col-status">Status</th>
-    </tr>
-  </thead>
-  <tbody id="uploadTbody"></tbody>
-</table>
+    <div class="upload-list" id="uploadList"></div>
     <div class="footer-note">Leave us a little memory ✨ <span>Thank you</span> for sharing our day.</div>
     <div class="footer-credit">Designed by Nick Carfagno</div>
   </div>
