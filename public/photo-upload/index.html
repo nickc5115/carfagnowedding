@@ -337,12 +337,12 @@
       touch-action: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Reserve space at top for the close/mute button row and respect
-         the iPhone notch + home indicator. */
+      /* Reserve space at the BOTTOM for the close/mute button row
+         (top URL bar / notch is unreliable territory on iOS Safari). */
       padding:
-        calc(env(safe-area-inset-top) + 64px)
+        calc(env(safe-area-inset-top) + 16px)
         env(safe-area-inset-right)
-        calc(env(safe-area-inset-bottom) + 16px)
+        calc(env(safe-area-inset-bottom) + 72px)
         env(safe-area-inset-left);
       box-sizing: border-box;
     }
@@ -372,16 +372,16 @@
       z-index: 10000;
     }
     .galaga-btn:hover { background: rgba(40, 40, 40, 0.7); }
-    /* Offset by safe-area insets so buttons sit clear of the iPhone notch
-       / Dynamic Island and aren't covered by Safari's URL bar. */
+    /* Buttons live at the BOTTOM of the viewport — away from the iOS
+       URL bar / notch, easy to reach with thumbs. */
     .galaga-close {
-      top: calc(env(safe-area-inset-top) + 12px);
-      right: calc(env(safe-area-inset-right) + 12px);
+      bottom: calc(env(safe-area-inset-bottom) + 14px);
+      right: calc(env(safe-area-inset-right) + 16px);
       font-size: 26px;
     }
     .galaga-mute {
-      top: calc(env(safe-area-inset-top) + 12px);
-      left: calc(env(safe-area-inset-left) + 12px);
+      bottom: calc(env(safe-area-inset-bottom) + 14px);
+      left: calc(env(safe-area-inset-left) + 16px);
       font-size: 18px;
     }
   </style>
