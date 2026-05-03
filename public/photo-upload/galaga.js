@@ -906,9 +906,34 @@
     muteBtn = document.getElementById("galagaMute");
   }
 
+  // Letterbox the 480x720 playfield into whatever the overlay's content
+  // box currently is. Re-run on every resize / orientation change /
+  // iOS Safari URL-bar collapse, so HUD and lives never get clipped.
+  function fitCanvas() {
+    if (!canvas || !overlay) return;
+    const r = overlay.getBoundingClientRect();
+    const padTop = parseFloat(getComputedStyle(overlay).paddingTop) || 0;
+    const padBottom = parseFloat(getComputedStyle(overlay).paddingBottom) || 0;
+    const padLeft = parseFloat(getComputedStyle(overlay).paddingLeft) || 0;
+    const padRight = parseFloat(getComputedStyle(overlay).paddingRight) || 0;
+    const availW = Math.max(1, r.width - padLeft - padRight);
+    const availH = Math.max(1, r.height - padTop - padBottom);
+    const ar = W / H;
+    let w = availW;
+    let h = w / ar;
+    if (h > availH) {
+      h = availH;
+      w = h * ar;
+    }
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+  }
+
   function attachInput() {
     window.addEventListener("keydown", onKeyDown, { passive: false });
     window.addEventListener("keyup", onKeyUp, { passive: false });
+    window.addEventListener("resize", fitCanvas);
+    window.addEventListener("orientationchange", fitCanvas);
     canvas.addEventListener("touchstart", onTouchStart, { passive: false });
     canvas.addEventListener("touchmove", onTouchMove, { passive: false });
     canvas.addEventListener("touchend", onTouchEnd, { passive: false });
@@ -920,6 +945,8 @@
   function detachInput() {
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("resize", fitCanvas);
+    window.removeEventListener("orientationchange", fitCanvas);
     canvas.removeEventListener("touchstart", onTouchStart);
     canvas.removeEventListener("touchmove", onTouchMove);
     canvas.removeEventListener("touchend", onTouchEnd);
@@ -949,6 +976,7 @@
     if (running) return;
     bootCanvas();
     overlay.hidden = false;
+    fitCanvas();
     try { hiscore = Number(localStorage.getItem(HISCORE_KEY) || "0") || 0; } catch (_) { hiscore = 0; }
     initStars();
     score = 0;
