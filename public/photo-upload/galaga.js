@@ -606,7 +606,7 @@
     else if (e.kind === "butterfly") pts = wasAttacking ? POINTS.butterflyDive : POINTS.butterfly;
     else pts = wasAttacking ? POINTS.bossDive : POINTS.boss;
     addScore(pts);
-    const color = e.kind === "bee" ? "#ffe14d" : e.kind === "butterfly" ? "#e64545" : "#33cc66";
+    const color = e.kind === "bee" ? "#c89968" : e.kind === "butterfly" ? "#e64545" : "#33cc66";
     explode(e.x, e.y, color, e.kind === "boss" ? 28 : 18);
     // Was this the boss carrying our captured ship? Rescue!
     if (e.carriesPlayer && capturedShip && capturedShip.bossId === e.id) {
@@ -782,32 +782,66 @@
     }
     ctx.save();
     ctx.translate(e.x, e.y);
-    if (e.angle) ctx.rotate(e.angle);
-    if (e.kind === "bee") drawBee(e.modeT);
+    // Ellies stay upright while diving — they're not insects, and a
+    // cartwheeling dog looks chaotic on swoop paths.
+    if (e.kind !== "bee" && e.angle) ctx.rotate(e.angle);
+    if (e.kind === "bee") drawEllie(e.modeT);
     else if (e.kind === "butterfly") drawButterfly(e.modeT);
     else drawBoss(e);
     ctx.restore();
   }
 
-  function drawBee(t) {
-    const flap = Math.sin(t * 16) * 3 + 4;
-    ctx.fillStyle = "#1a8a8a";
-    ctx.fillRect(-14, -2, flap, 4);
-    ctx.fillRect(14 - flap, -2, flap, 4);
-    ctx.fillStyle = "#ffe14d";
+  // Pixel-art Ellie (the Carfagno dog). Tan body, dark face mask,
+  // perky ears, white muzzle, wagging tail.
+  function drawEllie(t) {
+    const wag = Math.sin(t * 9) * 2;
+    const TAN = "#c89968";
+    const TAN_SHADOW = "#a87a4a";
+    const DARK = "#3d2818";
+    const DARKER = "#241410";
+    const WHITE = "#f5e8d0";
+    // Tail (wagging)
+    ctx.fillStyle = TAN;
+    ctx.fillRect(9, 1, 3 + wag, 3);
+    // Body
+    ctx.fillStyle = TAN;
+    ctx.fillRect(-9, -1, 18, 8);
+    // Body shadow under
+    ctx.fillStyle = TAN_SHADOW;
+    ctx.fillRect(-9, 6, 18, 2);
+    // Stubby legs
+    ctx.fillStyle = TAN_SHADOW;
+    ctx.fillRect(-7, 7, 3, 3);
+    ctx.fillRect(-1, 7, 3, 3);
+    ctx.fillRect(5, 7, 3, 3);
+    // Head: tan base
+    ctx.fillStyle = TAN;
+    ctx.fillRect(-7, -9, 14, 8);
+    // Dark mask across forehead/eyes
+    ctx.fillStyle = DARK;
+    ctx.fillRect(-7, -9, 14, 4);
+    // Ears (dark, perky)
+    ctx.fillStyle = DARKER;
     ctx.beginPath();
-    ctx.ellipse(0, 0, 9, 8, 0, 0, Math.PI * 2);
+    ctx.moveTo(-8, -10); ctx.lineTo(-6, -14); ctx.lineTo(-4, -9); ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#000";
-    ctx.fillRect(-4, -2, 2, 2);
-    ctx.fillRect(2, -2, 2, 2);
-    // antennae
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(-3, -7); ctx.lineTo(-5, -11);
-    ctx.moveTo(3, -7);  ctx.lineTo(5, -11);
-    ctx.stroke();
+    ctx.moveTo(4, -9); ctx.lineTo(6, -14); ctx.lineTo(8, -10); ctx.closePath();
+    ctx.fill();
+    // White muzzle stripe
+    ctx.fillStyle = WHITE;
+    ctx.fillRect(-3, -4, 6, 3);
+    // Eyes
+    ctx.fillStyle = "#000";
+    ctx.fillRect(-5, -6, 2, 2);
+    ctx.fillRect(3, -6, 2, 2);
+    // Eye glints
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(-4, -6, 1, 1);
+    ctx.fillRect(4, -6, 1, 1);
+    // Nose
+    ctx.fillStyle = "#000";
+    ctx.fillRect(-1, -2, 2, 2);
   }
 
   function drawButterfly(t) {
