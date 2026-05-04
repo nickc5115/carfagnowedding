@@ -68,7 +68,10 @@ function setUploaderName(name) {
 }
 
 function showAuthGate(message) {
-  if (authGate) authGate.classList.add("is-active");
+  if (authGate) {
+    authGate.classList.add("is-active");
+    authGate.removeAttribute("inert");
+  }
   if (authHint && message) authHint.textContent = message;
   if (authName) authName.focus();
   turnstileGateVisible = true;
@@ -76,7 +79,10 @@ function showAuthGate(message) {
 }
 
 function hideAuthGate() {
-  if (authGate) authGate.classList.remove("is-active");
+  if (authGate) {
+    authGate.classList.remove("is-active");
+    authGate.setAttribute("inert", "");
+  }
   if (authHint) authHint.textContent = "";
 }
 
@@ -125,10 +131,11 @@ function maybeRenderTurnstile() {
   turnstileWidgetId = window.turnstile.render(turnstileEl, {
     sitekey: turnstileSiteKey,
     theme: "light",
-    // Invisible mode: no widget UI on the page, no auto-verification.
-    // Verification only runs when we call turnstile.execute() at submit
-    // time, so it can't intercept taps while the user is typing.
-    size: "invisible",
+    // Defer all widget activity until we call turnstile.execute() from
+    // the submit handler — keeps the widget from intercepting taps
+    // while the user is filling out the form on mobile. The widget
+    // only shows UI if a challenge is required at execute time.
+    appearance: "execute",
     callback: (token) => {
       if (turnstilePending) {
         turnstilePending.resolve(token || "");
