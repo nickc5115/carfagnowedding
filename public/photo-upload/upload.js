@@ -74,8 +74,6 @@ function showAuthGate(message) {
   }
   if (authHint && message) authHint.textContent = message;
   if (authName) authName.focus();
-  turnstileGateVisible = true;
-  if (typeof maybeRenderTurnstile === "function") maybeRenderTurnstile();
 }
 
 function hideAuthGate() {
@@ -116,25 +114,35 @@ const turnstileEl = document.getElementById("turnstileWidget");
 const turnstileSiteKey = turnstileEl ? turnstileEl.getAttribute("data-sitekey") : "";
 const turnstileEnabled = !!(turnstileEl && turnstileSiteKey && turnstileSiteKey !== "YOUR_TURNSTILE_SITE_KEY");
 let turnstileWidgetId = null;
-
-let turnstileReady = false;
-let turnstileGateVisible = false;
-
-// Promise plumbing for the invisible widget: execute() returns nothing,
-// the token arrives via the success callback. We park resolve/reject here.
+let turnstileScriptPromise = null;
+// execute() returns nothing — token arrives via the success callback.
+// Park the resolve/reject of the active execute() call here.
 let turnstilePending = null;
 
-function maybeRenderTurnstile() {
-  if (!turnstileEnabled || turnstileWidgetId !== null) return;
-  if (!turnstileReady || !turnstileGateVisible) return;
-  if (!window.turnstile || typeof window.turnstile.render !== "function") return;
+function loadTurnstileScript() {
+  if (turnstileScriptPromise) return turnstileScriptPromise;
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    if (window.turnstile && typeof window.turnstile.render === "function") {
+      resolve();
+      return;
+    }
+    const cbName = "__onloadTurnstileCallback";
+    window[cbName] = () => resolve();
+    const s = document.createElement("script");
+    s.src = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=${cbName}`;
+    s.async = true;
+    s.defer = true;
+    s.onerror = () => reject(new Error("turnstile-script-failed"));
+    document.head.appendChild(s);
+  });
+  return turnstileScriptPromise;
+}
+
+function renderTurnstile() {
+  if (turnstileWidgetId !== null) return;
   turnstileWidgetId = window.turnstile.render(turnstileEl, {
     sitekey: turnstileSiteKey,
     theme: "light",
-    // Defer all widget activity until we call turnstile.execute() from
-    // the submit handler — keeps the widget from intercepting taps
-    // while the user is filling out the form on mobile. The widget
-    // only shows UI if a challenge is required at execute time.
     appearance: "execute",
     callback: (token) => {
       if (turnstilePending) {
@@ -151,11 +159,10 @@ function maybeRenderTurnstile() {
   });
 }
 
-function executeTurnstile() {
-  if (!turnstileEnabled) return Promise.resolve("");
-  if (!window.turnstile || turnstileWidgetId === null) {
-    return Promise.reject(new Error("turnstile-not-ready"));
-  }
+async function executeTurnstile() {
+  if (!turnstileEnabled) return "";
+  await loadTurnstileScript();
+  renderTurnstile();
   return new Promise((resolve, reject) => {
     if (turnstilePending) turnstilePending.reject(new Error("turnstile-superseded"));
     turnstilePending = { resolve, reject };
@@ -174,22 +181,16 @@ function resetTurnstile() {
   window.turnstile.reset(turnstileWidgetId);
 }
 
-// Turnstile api.js is loaded with ?render=explicit&onload=onloadTurnstileCallback.
-// We can't render until BOTH the library is ready AND the auth gate is visible
-// (Turnstile won't render into a display:none container).
-window.onloadTurnstileCallback = () => {
-  turnstileReady = true;
-  maybeRenderTurnstile();
-};
-
-// Cover the race where api.js loaded before this script ran.
-if (turnstileEnabled && window.turnstile && typeof window.turnstile.render === "function") {
-  turnstileReady = true;
-}
-
-if (!turnstileEnabled && turnstileEl) {
-  // Hide the empty container so it doesn't add blank space.
-  turnstileEl.style.display = "none";
+if (turnstileEl) {
+  // Container is only used as a render target for an invisible widget.
+  // Take it out of flow without display:none (Turnstile won't render
+  // into a display:none element).
+  turnstileEl.style.position = "absolute";
+  turnstileEl.style.left = "-9999px";
+  turnstileEl.style.width = "1px";
+  turnstileEl.style.height = "1px";
+  turnstileEl.style.overflow = "hidden";
+  turnstileEl.style.margin = "0";
 }
 
 function initAuthGate() {

@@ -7,12 +7,11 @@
   <link rel="icon" type="image/png" href="/photo-upload/logo.png" />
   <link rel="apple-touch-icon" href="/photo-upload/logo.png" />
   <!--
-    Turnstile (Cloudflare bot protection). Replace YOUR_TURNSTILE_SITE_KEY
-    with the site key from your Turnstile dashboard. If left as the
-    placeholder, the widget will show an error and the auth gate will
-    refuse to submit (the script also handles a no-Turnstile case).
+    Turnstile (Cloudflare bot protection) is loaded lazily by upload.js
+    on the first submit attempt — loading it eagerly here injected an
+    iframe that intercepted taps on mobile while the form was being
+    filled out. See public/photo-upload/upload.js.
   -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onloadTurnstileCallback" async defer></script>
 
   <style>
     :root {
