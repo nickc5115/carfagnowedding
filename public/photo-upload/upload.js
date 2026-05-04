@@ -114,19 +114,52 @@ let turnstileWidgetId = null;
 let turnstileReady = false;
 let turnstileGateVisible = false;
 
+// Promise plumbing for the invisible widget: execute() returns nothing,
+// the token arrives via the success callback. We park resolve/reject here.
+let turnstilePending = null;
+
 function maybeRenderTurnstile() {
   if (!turnstileEnabled || turnstileWidgetId !== null) return;
   if (!turnstileReady || !turnstileGateVisible) return;
   if (!window.turnstile || typeof window.turnstile.render !== "function") return;
   turnstileWidgetId = window.turnstile.render(turnstileEl, {
     sitekey: turnstileSiteKey,
-    theme: "light"
+    theme: "light",
+    // Invisible mode: no widget UI on the page, no auto-verification.
+    // Verification only runs when we call turnstile.execute() at submit
+    // time, so it can't intercept taps while the user is typing.
+    size: "invisible",
+    callback: (token) => {
+      if (turnstilePending) {
+        turnstilePending.resolve(token || "");
+        turnstilePending = null;
+      }
+    },
+    "error-callback": () => {
+      if (turnstilePending) {
+        turnstilePending.reject(new Error("turnstile-error"));
+        turnstilePending = null;
+      }
+    }
   });
 }
 
-function getTurnstileToken() {
-  if (!turnstileEnabled || !window.turnstile || turnstileWidgetId === null) return "";
-  return window.turnstile.getResponse(turnstileWidgetId) || "";
+function executeTurnstile() {
+  if (!turnstileEnabled) return Promise.resolve("");
+  if (!window.turnstile || turnstileWidgetId === null) {
+    return Promise.reject(new Error("turnstile-not-ready"));
+  }
+  return new Promise((resolve, reject) => {
+    if (turnstilePending) turnstilePending.reject(new Error("turnstile-superseded"));
+    turnstilePending = { resolve, reject };
+    try {
+      window.turnstile.reset(turnstileWidgetId);
+      window.turnstile.execute(turnstileWidgetId);
+    } catch (err) {
+      turnstilePending = null;
+      reject(err);
+    }
+  });
 }
 
 function resetTurnstile() {
@@ -168,17 +201,23 @@ function initAuthGate() {
       if (authHint) authHint.textContent = "Name and password required.";
       return;
     }
-    const token = getTurnstileToken();
-    if (turnstileEnabled && !token) {
-      if (authHint) authHint.textContent = "Please complete the verification challenge.";
-      return;
+    let token = "";
+    if (turnstileEnabled) {
+      if (authHint) authHint.textContent = "Verifying…";
+      try {
+        token = await executeTurnstile();
+      } catch (_) {
+        if (authHint) authHint.textContent = "Verification failed. Please try again.";
+        resetTurnstile();
+        return;
+      }
     }
     const result = await verifyPassword(pw, token);
     if (result.ok) {
       setUploaderName(name);
       setPassword(pw);
     } else if (result.status === 403) {
-      if (authHint) authHint.textContent = "Verification failed. Please try the challenge again.";
+      if (authHint) authHint.textContent = "Verification failed. Please try again.";
       resetTurnstile();
     } else if (authHint) {
       authHint.textContent = "Wrong password. Please try again.";
